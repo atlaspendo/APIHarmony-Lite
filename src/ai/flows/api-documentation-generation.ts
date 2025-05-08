@@ -5,12 +5,13 @@
  * - generateApiDocumentation - A function that handles the API documentation generation process.
  * - GenerateApiDocumentationInput - The input type for the generateApiDocumentation function.
  * - GenerateApiDocumentationOutput - The return type for the generateApiDocumentation function.
+ * - GenerateApiDocumentationInputSchema - The Zod schema for the input.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const GenerateApiDocumentationInputSchema = z.object({
+export const GenerateApiDocumentationInputSchema = z.object({
   description: z
     .string()
     .min(50, { message: "Description must be at least 50 characters long."})

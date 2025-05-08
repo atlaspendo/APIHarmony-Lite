@@ -5,12 +5,13 @@
  * - analyzeApiHealth - A function that handles the API health analysis.
  * - AnalyzeApiHealthInput - The input type for the analyzeApiHealth function.
  * - AnalyzeApiHealthOutput - The return type for the analyzeApiHealth function.
+ * - AnalyzeApiHealthInputSchema - The Zod schema for the input.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const AnalyzeApiHealthInputSchema = z.object({
+export const AnalyzeApiHealthInputSchema = z.object({
   apiLogs: z
     .string()
     .optional()
@@ -53,20 +54,9 @@ const AnalyzeApiHealthOutputSchema = z.object({
 export type AnalyzeApiHealthOutput = z.infer<typeof AnalyzeApiHealthOutputSchema>;
 
 export async function analyzeApiHealth(input: AnalyzeApiHealthInput): Promise<AnalyzeApiHealthOutput> {
-  // Validation is now handled by Zod's refine, but an explicit check can remain if desired,
-  // or rely on Zod to throw an error if refine fails before calling the flow.
-  // For this case, if refine is correctly implemented, this explicit check might be redundant
-  // as the schema parsing itself would fail. However, Genkit might not automatically
-  // validate input schemas for flows if called directly programmatically without an API endpoint.
-  // The prompt's input validation applies when the LLM is called.
-  // The error message stated Server Actions must be async, and the refine was a synchronous lambda.
-  // However, the primary issue is often what's exported.
-  // The refine in Zod schema is fine as it's part of schema definition, not an exported server action.
-  // The key fix is likely ensuring only async functions and types are exported.
-
-  // If the Zod schema is used in `ai.defineFlow`'s `inputSchema`, Genkit might handle this validation.
-  // If not, or for programmatic calls, this check is useful.
   if (!input.apiLogs && !input.metricsData) {
+    // This explicit check might be redundant if Zod's refine is correctly triggered
+    // by Genkit's flow input validation, but it's a safe fallback.
     throw new Error("Either API logs or metrics data must be provided.");
   }
   return analyzeApiHealthFlow(input);
@@ -110,7 +100,7 @@ const analyzeApiHealthFlow = ai.defineFlow(
     inputSchema: AnalyzeApiHealthInputSchema,
     outputSchema: AnalyzeApiHealthOutputSchema,
   },
-  async (input: AnalyzeApiHealthInput) => { // Explicitly type input here for clarity
+  async (input: AnalyzeApiHealthInput) => { 
     const {output} = await prompt(input);
     return output!;
   }

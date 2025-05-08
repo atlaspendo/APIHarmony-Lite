@@ -10,14 +10,14 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const IntegrationPatternAnalysisInputSchema = z.object({
+const IntegrationPatternAnalysisInputSchema = z.object({
   openApiSpec: z
     .string()
     .describe('The OpenAPI specification to analyze for integration design patterns and anti-patterns.'),
 });
 export type IntegrationPatternAnalysisInput = z.infer<typeof IntegrationPatternAnalysisInputSchema>;
 
-export const IntegrationPatternAnalysisOutputSchema = z.object({
+const IntegrationPatternAnalysisOutputSchema = z.object({
   identifiedPatterns: z
     .array(z.object({ 
         name: z.string().describe("Name of the identified integration pattern."), 
@@ -70,7 +70,7 @@ const integrationPatternAnalysisFlow = ai.defineFlow(
     inputSchema: IntegrationPatternAnalysisInputSchema,
     outputSchema: IntegrationPatternAnalysisOutputSchema,
   },
-  async input => {
+  async (input: IntegrationPatternAnalysisInput) => {
     if (input.openApiSpec.includes("error_trigger_for_integration_analysis")) {
         throw new Error("Simulated error during integration pattern analysis.");
     }

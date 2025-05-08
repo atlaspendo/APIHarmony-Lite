@@ -10,7 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const CheckApiComplianceInputSchema = z.object({
+const CheckApiComplianceInputSchema = z.object({
   openApiSpec: z
     .string()
     .describe('The OpenAPI specification (YAML or JSON string) to analyze for compliance.'),
@@ -21,7 +21,7 @@ export const CheckApiComplianceInputSchema = z.object({
 });
 export type CheckApiComplianceInput = z.infer<typeof CheckApiComplianceInputSchema>;
 
-export const CheckApiComplianceOutputSchema = z.object({
+const CheckApiComplianceOutputSchema = z.object({
   checksPerformed: z
     .array(z.object({
       ruleId: z.string().describe("A unique identifier for the compliance rule checked."),
@@ -113,7 +113,7 @@ const checkApiComplianceFlow = ai.defineFlow(
     inputSchema: CheckApiComplianceInputSchema,
     outputSchema: CheckApiComplianceOutputSchema,
   },
-  async input => {
+  async (input: CheckApiComplianceInput) => {
     const {output} = await prompt(input);
     return output!;
   }

@@ -10,7 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const GenerateApiDocumentationInputSchema = z.object({
+const GenerateApiDocumentationInputSchema = z.object({
   description: z
     .string()
     .min(50, { message: "Description must be at least 50 characters long."})
@@ -22,7 +22,7 @@ export const GenerateApiDocumentationInputSchema = z.object({
 });
 export type GenerateApiDocumentationInput = z.infer<typeof GenerateApiDocumentationInputSchema>;
 
-export const GenerateApiDocumentationOutputSchema = z.object({
+const GenerateApiDocumentationOutputSchema = z.object({
   generatedSpec: z
     .string()
     .describe('The generated OpenAPI 3.0.x specification in YAML format.'),
@@ -70,7 +70,7 @@ const generateApiDocumentationFlow = ai.defineFlow(
     inputSchema: GenerateApiDocumentationInputSchema,
     outputSchema: GenerateApiDocumentationOutputSchema,
   },
-  async input => {
+  async (input: GenerateApiDocumentationInput) => {
     const {output} = await prompt(input);
     return output!;
   }

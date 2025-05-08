@@ -10,7 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const AnalyzeApiHealthInputSchema = z.object({
+const AnalyzeApiHealthInputSchema = z.object({
   apiLogs: z
     .string()
     .optional()
@@ -19,13 +19,12 @@ export const AnalyzeApiHealthInputSchema = z.object({
     .string()
     .optional()
     .describe('JSON string representing timeseries metrics data. For example: [{timestamp: "YYYY-MM-DDTHH:mm:ssZ", latency_ms: 120, error_rate: 0.05, throughput_rpm: 500}, ...]. Ensure at least one of logs or metrics is provided.'),
+}).refine(data => data.apiLogs || data.metricsData, {
+  message: "Either API logs or metrics data must be provided.",
 });
-// .refine(data => data.apiLogs || data.metricsData, { // Removed due to Next.js compiler error
-//   message: "Either API logs or metrics data must be provided.",
-// });
 export type AnalyzeApiHealthInput = z.infer<typeof AnalyzeApiHealthInputSchema>;
 
-export const AnalyzeApiHealthOutputSchema = z.object({
+const AnalyzeApiHealthOutputSchema = z.object({
   anomalies: z
     .array(z.object({
       timestamp: z.string().optional().describe("Timestamp of the anomaly if identifiable."),
@@ -54,6 +53,19 @@ export const AnalyzeApiHealthOutputSchema = z.object({
 export type AnalyzeApiHealthOutput = z.infer<typeof AnalyzeApiHealthOutputSchema>;
 
 export async function analyzeApiHealth(input: AnalyzeApiHealthInput): Promise<AnalyzeApiHealthOutput> {
+  // Validation is now handled by Zod's refine, but an explicit check can remain if desired,
+  // or rely on Zod to throw an error if refine fails before calling the flow.
+  // For this case, if refine is correctly implemented, this explicit check might be redundant
+  // as the schema parsing itself would fail. However, Genkit might not automatically
+  // validate input schemas for flows if called directly programmatically without an API endpoint.
+  // The prompt's input validation applies when the LLM is called.
+  // The error message stated Server Actions must be async, and the refine was a synchronous lambda.
+  // However, the primary issue is often what's exported.
+  // The refine in Zod schema is fine as it's part of schema definition, not an exported server action.
+  // The key fix is likely ensuring only async functions and types are exported.
+
+  // If the Zod schema is used in `ai.defineFlow`'s `inputSchema`, Genkit might handle this validation.
+  // If not, or for programmatic calls, this check is useful.
   if (!input.apiLogs && !input.metricsData) {
     throw new Error("Either API logs or metrics data must be provided.");
   }
@@ -98,9 +110,8 @@ const analyzeApiHealthFlow = ai.defineFlow(
     inputSchema: AnalyzeApiHealthInputSchema,
     outputSchema: AnalyzeApiHealthOutputSchema,
   },
-  async input => {
+  async (input: AnalyzeApiHealthInput) => { // Explicitly type input here for clarity
     const {output} = await prompt(input);
     return output!;
   }
 );
-

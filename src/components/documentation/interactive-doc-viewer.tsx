@@ -36,20 +36,33 @@ function isOpenAPIV2(doc: OpenAPI.Document): doc is OpenAPIV2.Document {
 const SchemaDisplay = ({ schema, name }: { schema: OpenAPIV3.SchemaObject | OpenAPIV2.SchemaObject, name?: string }) => {
   if (!schema) return <p className="text-sm text-muted-foreground">No schema details available.</p>;
 
-  const properties = schema.properties || (schema.items && (schema.items as any).properties ? (schema.items as any).properties : null);
+  const properties = schema.properties || (schema.type === 'array' && schema.items && (schema.items as any).properties ? (schema.items as any).properties : null);
   const type = schema.type || (properties ? 'object' : 'unknown');
-  
+  const enumValues = (schema as any).enum as any[] | undefined;
+
   return (
     <div className="text-xs p-2 border rounded-md bg-secondary/30 my-1">
       {name && <p className="font-semibold">{name} <Badge variant="outline" className="ml-1">{type}</Badge></p>}
       {!name && <p><Badge variant="outline">{type}</Badge></p>}
       {schema.description && <p className="text-muted-foreground text-xs mt-1">{schema.description}</p>}
       {schema.format && <p className="text-xs text-muted-foreground">Format: {schema.format}</p>}
+      
+      {enumValues && Array.isArray(enumValues) && enumValues.length > 0 && (
+        <div className="mt-1">
+          <p className="text-xs font-medium">Enum Values:</p>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {enumValues.map((val, idx) => (
+              <Badge key={idx} variant="secondary" className="text-xs font-normal">{String(val)}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       {schema.example && <pre className="mt-1 p-1 bg-muted rounded text-xs overflow-auto">Example: {JSON.stringify(schema.example, null, 2)}</pre>}
       
-      {type === 'array' && schema.items && (
+      {type === 'array' && schema.items && !(schema.items as any).properties && ( // Handle array of simple types or array of enums
         <div className="ml-4 mt-1">
-          <p className="text-xs font-medium">Items:</p>
+          <p className="text-xs font-medium">Items type: <Badge variant="outline">{(schema.items as any).type || 'object'}</Badge></p>
           <SchemaDisplay schema={schema.items as OpenAPIV3.SchemaObject | OpenAPIV2.SchemaObject} />
         </div>
       )}
@@ -64,13 +77,37 @@ const SchemaDisplay = ({ schema, name }: { schema: OpenAPIV3.SchemaObject | Open
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Object.entries(properties).map(([propName, propSchema]) => (
-              <TableRow key={propName}>
-                <TableCell className="font-mono">{propName}</TableCell>
-                <TableCell>{(propSchema as any).type}{ (propSchema as any).format ? `(${(propSchema as any).format})` : ''}</TableCell>
-                <TableCell>{(propSchema as any).description || '-'}</TableCell>
-              </TableRow>
-            ))}
+            {Object.entries(properties).map(([propName, propDef]) => {
+              const propSchema = propDef as OpenAPIV3.SchemaObject | OpenAPIV2.SchemaObject;
+              const propEnumValues = (propSchema as any).enum as any[] | undefined;
+              return (
+                <TableRow key={propName}>
+                  <TableCell className="font-mono py-1">{propName}</TableCell>
+                  <TableCell className="py-1">
+                    {(propSchema as any).type}
+                    {(propSchema as any).format ? `(${(propSchema as any).format})` : ''}
+                    {/* Display enum values for property if they exist and it's not too verbose */}
+                    {propEnumValues && Array.isArray(propEnumValues) && propEnumValues.length > 0 && propEnumValues.length < 6 && ( 
+                       <span className="ml-1 text-muted-foreground">({propEnumValues.map(String).join(', ')})</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-1">
+                    {(propSchema as any).description || '-'}
+                    {/* More detailed enum display for properties if too long for type column */}
+                    {propEnumValues && Array.isArray(propEnumValues) && propEnumValues.length >= 6 && (
+                        <div className="mt-0.5">
+                            <p className="text-xxs font-medium text-muted-foreground">Enum:</p>
+                            <div className="flex flex-wrap gap-0.5 mt-0.5">
+                                {propEnumValues.map((val, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xxs px-1 py-0 font-normal">{String(val)}</Badge>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -178,6 +215,7 @@ const OperationDetailsV3 = ({ path, method, operation }: { path: string, method:
                     {mediaTypeObj.schema && <SchemaDisplay schema={mediaTypeObj.schema as OpenAPIV3.SchemaObject}/>}
                   </div>
                 ))}
+                 {!res.content && <p className="text-xs text-muted-foreground">No content defined for this response.</p>}
               </AccordionContent>
             </AccordionItem>
           )
@@ -223,7 +261,7 @@ const OperationDetailsV2 = ({ path, method, operation }: { path: string, method:
           <div className="mb-4">
             <h4 className="font-semibold text-md mb-2">Parameters</h4>
             <Table>
-               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>In</TableHead><TableHead>Required</TableHead><TableHead>Type</TableHead><TableHead>Description</TableHead></TableRow></TableHeader>
+               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>In</TableHead><TableHead>Required</TableHead><TableHead>Type</TableHead><TableHead>Schema/Details</TableHead><TableHead>Description</TableHead></TableRow></TableHeader>
               <TableBody>
                 {operation.parameters.map((param, idx) => {
                   const p = param as OpenAPIV2.Parameter;
@@ -233,6 +271,7 @@ const OperationDetailsV2 = ({ path, method, operation }: { path: string, method:
                       <TableCell>{p.in}</TableCell>
                       <TableCell>{p.required ? <Icons.CheckCircle2 className="text-green-500 w-4 h-4"/> : <Icons.XCircle className="text-red-500 w-4 h-4"/>}</TableCell>
                       <TableCell>{p.type} {p.format ? `(${p.format})` : ''}</TableCell>
+                       <TableCell>{p.schema ? <SchemaDisplay schema={p.schema as OpenAPIV2.SchemaObject} /> : (p.items ? <SchemaDisplay schema={p.items as OpenAPIV2.SchemaObject} name="items"/> : 'N/A')}</TableCell>
                       <TableCell>{p.description || '-'}</TableCell>
                     </TableRow>
                   );
@@ -254,6 +293,7 @@ const OperationDetailsV2 = ({ path, method, operation }: { path: string, method:
               </AccordionTrigger>
               <AccordionContent className="px-3 py-2">
                 {res.schema && <SchemaDisplay schema={res.schema} />}
+                {!res.schema && <p className="text-xs text-muted-foreground">No schema defined for this response.</p>}
               </AccordionContent>
             </AccordionItem>
           )
@@ -307,11 +347,15 @@ export function InteractiveDocViewer() {
   
   const methodColorsCSS = `
     <style>
-      .method-get { --method-get-bg: hsl(var(--accent)); --method-get-fg: hsl(var(--accent-foreground)); --method-get-border: hsl(var(--accent)); }
-      .method-post { --method-post-bg: hsl(130 50% 45% / 1); --method-post-fg: hsl(0 0% 98%); --method-post-border: hsl(130 50% 40% / 1); }
-      .method-put { --method-put-bg: hsl(38 90% 55% / 1); --method-put-fg: hsl(0 0% 0%); --method-put-border: hsl(38 90% 50% / 1); }
-      .method-delete { --method-delete-bg: hsl(0 70% 50% / 1); --method-delete-fg: hsl(0 0% 98%); --method-delete-border: hsl(0 70% 45% / 1); }
-      .method-patch { --method-patch-bg: hsl(280 50% 55% / 1); --method-patch-fg: hsl(0 0% 98%); --method-patch-border: hsl(280 50% 50% / 1); }
+      .method-get { --method-get-bg: hsl(var(--chart-1)); --method-get-fg: hsl(var(--primary-foreground)); --method-get-border: hsl(var(--chart-1)); }
+      .method-post { --method-post-bg: hsl(var(--chart-2)); --method-post-fg: hsl(var(--primary-foreground)); --method-post-border: hsl(var(--chart-2)); }
+      .method-put { --method-put-bg: hsl(var(--chart-3)); --method-put-fg: hsl(var(--primary-foreground)); --method-put-border: hsl(var(--chart-3)); }
+      .method-delete { --method-delete-bg: hsl(var(--destructive)); --method-delete-fg: hsl(var(--destructive-foreground)); --method-delete-border: hsl(var(--destructive)); }
+      .method-patch { --method-patch-bg: hsl(var(--chart-4)); --method-patch-fg: hsl(var(--primary-foreground)); --method-patch-border: hsl(var(--chart-4)); }
+      .method-options { --method-options-bg: hsl(var(--muted)); --method-options-fg: hsl(var(--muted-foreground)); --method-options-border: hsl(var(--muted)); }
+      .method-head { --method-head-bg: hsl(var(--muted)); --method-head-fg: hsl(var(--muted-foreground)); --method-head-border: hsl(var(--muted)); }
+      .method-trace { --method-trace-bg: hsl(var(--muted)); --method-trace-fg: hsl(var(--muted-foreground)); --method-trace-border: hsl(var(--muted)); }
+      .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
     </style>
   `;
 
@@ -379,7 +423,7 @@ export function InteractiveDocViewer() {
         </CardContent>
       </Card>
       
-      {isV3 && (spec as OpenAPIV3.Document).components?.schemas && (
+      {isV3 && (spec as OpenAPIV3.Document).components?.schemas && Object.keys((spec as OpenAPIV3.Document).components!.schemas!).length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2"><Icons.FileJson /> Schemas</CardTitle>
@@ -398,10 +442,10 @@ export function InteractiveDocViewer() {
           </CardContent>
         </Card>
       )}
-       {isV2 && (spec as OpenAPIV2.Document).definitions && (
+       {isV2 && (spec as OpenAPIV2.Document).definitions && Object.keys((spec as OpenAPIV2.Document).definitions!).length > 0 &&(
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-2xl flex items-center gap-2"><Icons.FileJson /> Definitions</CardTitle>
+            <CardTitle className="text-2xl flex items-center gap-2"><Icons.FileJson /> Definitions (Swagger 2.0)</CardTitle>
           </CardHeader>
           <CardContent>
             <Accordion type="multiple" className="w-full">
@@ -432,3 +476,4 @@ export function InteractiveDocViewer() {
     </div>
   );
 }
+

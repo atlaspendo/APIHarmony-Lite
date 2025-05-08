@@ -31,6 +31,11 @@ export async function saveOpenApiSpec(
         `A Prisma error occurred (Code: ${error.code}) while saving the OpenAPI specification. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      if (error.message.includes('libssl') || error.message.includes('openssl')) {
+        throw new Error(
+            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}). Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
+        );
+      }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}) while saving. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
       );
@@ -70,6 +75,11 @@ export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
         `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specifications. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      if (error.message.includes('libssl') || error.message.includes('openssl')) {
+        throw new Error(
+            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}). Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
+        );
+      }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}). Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
       );
@@ -107,6 +117,11 @@ export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null
         `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      if (error.message.includes('libssl') || error.message.includes('openssl')) {
+        throw new Error(
+            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
+        );
+      }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
       );
@@ -146,6 +161,11 @@ export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
             `A Prisma error occurred (Code: ${error.code}) while deleting OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
           );
         } else if (error instanceof Prisma.PrismaClientInitializationError) {
+          if (error.message.includes('libssl') || error.message.includes('openssl')) {
+            throw new Error(
+                `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
+            );
+          }
           throw new Error(
             `Database connection failed (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
           );
@@ -164,3 +184,4 @@ export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
         );
     }
 }
+

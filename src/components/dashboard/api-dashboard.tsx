@@ -14,19 +14,28 @@ import { AnomalyItem } from "./anomaly-item";
 import type { ChartConfig } from "@/components/ui/chart"; 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import type { OpenAPIV3 } from 'openapi-types';
 
-// Placeholder data for charts (remains simulated)
-const generateLineChartData = (points = 7) => {
-  return Array.from({ length: points }, (_, i) => ({
-    name: `T-${points - 1 - i}`, 
-    value: Math.floor(Math.random() * (80 - 20 + 1) + 20), 
-  }));
+// Helper to generate somewhat realistic time-series data
+const generateLineChartData = (points = 7, minVal = 20, maxVal = 80, trend: 'up' | 'down' | 'stable' = 'stable', noise = 5) => {
+  let currentValue = (minVal + maxVal) / 2;
+  return Array.from({ length: points }, (_, i) => {
+    const trendFactor = trend === 'up' ? (i / points) * (maxVal - minVal) / 2 : trend === 'down' ? -(i / points) * (maxVal - minVal) / 2 : 0;
+    const randomNoise = (Math.random() - 0.5) * noise;
+    currentValue = Math.max(minVal, Math.min(maxVal, ((minVal + maxVal) / 2) + trendFactor + randomNoise));
+    return {
+      name: `T-${points - 1 - i}`, 
+      value: parseFloat(currentValue.toFixed(1)), 
+    };
+  }).reverse(); // Ensure T-0 is the latest
 };
 
-const initialMemoryUsageData = generateLineChartData();
-const initialCpuUsageData = generateLineChartData();
-const initialResponseTimeData = generateLineChartData(7).map(d => ({...d, value: Math.floor(Math.random() * (300 - 50 + 1) + 50)}));
-const initialErrorRateData = generateLineChartData(7).map(d => ({...d, value: parseFloat((Math.random() * 5).toFixed(1))}));
+
+const initialMemoryUsageData = generateLineChartData(7, 30, 70, 'stable', 10);
+const initialCpuUsageData = generateLineChartData(7, 20, 60, 'stable', 8);
+const initialResponseTimeData = generateLineChartData(7, 50, 300, 'stable', 50);
+const initialErrorRateData = generateLineChartData(7, 0, 5, 'stable', 1);
+
 
 const metricsChartConfig: ChartConfig = {
   memory: { label: "Memory", color: "hsl(var(--chart-1))" },
@@ -35,45 +44,53 @@ const metricsChartConfig: ChartConfig = {
   error: { label: "Error", color: "hsl(var(--chart-4))" },
 };
 
-// System health and anomaly data remain illustrative examples for now
-const exampleSystemHealthData = [
-  { name: "Customer Portal API", status: "Warning", details: "Memory usage increasing", Icon: Icons.Server },
-  { name: "CRM API Gateway", status: "Healthy", details: "99.9% uptime", Icon: Icons.Network },
-  { name: "Inventory Service", status: "Healthy", details: "Nominal throughput", Icon: Icons.ListChecks },
-  { name: "Payment Processor", status: "Critical", details: "High error rate on transactions", Icon: Icons.AlertOctagon },
-];
-
-const exampleAnomalyData = [
-  {
-    title: "Illustrative: Memory Usage Anomaly",
-    description: "Simulated: Memory usage increasing. This is an example anomaly.",
-    severity: "High",
-    timestamp: new Date().toLocaleString(),
-  },
-  {
-    title: "Illustrative: Elevated Error Rate",
-    description: "Simulated: Example of an elevated error rate on an endpoint.",
-    severity: "Medium",
-    timestamp: new Date(Date.now() - 3600000).toLocaleString(), // 1 hour ago
-  },
-];
-
 const MAX_SIMULATION_SECONDS = 30;
 
 export function ApiDashboard() {
-  const { spec, fileName, error: specError } = useOpenApiStore();
+  const { spec, fileName, error: specError, rawSpec } = useOpenApiStore();
   const { toast } = useToast();
 
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationTimeElapsed, setSimulationTimeElapsed] = useState(0);
   const [simulationIntervalId, setSimulationIntervalId] = useState<NodeJS.Timeout | null>(null);
-  const [currentScenario, setCurrentScenario] = useState("Memory Leak Simulation");
+  const [currentScenario, setCurrentScenario] = useState("Normal Operation");
   
-  // State for metric data that might change during simulation
   const [memoryUsageData, setMemoryUsageData] = useState(initialMemoryUsageData);
   const [cpuUsageData, setCpuUsageData] = useState(initialCpuUsageData);
   const [responseTimeData, setResponseTimeData] = useState(initialResponseTimeData);
   const [errorRateData, setErrorRateData] = useState(initialErrorRateData);
+  const [systemHealthData, setSystemHealthData] = useState<any[]>([]);
+  const [anomalyData, setAnomalyData] = useState<any[]>([]);
+
+
+  const extractEndpoints = useCallback(() => {
+    if (!spec || !spec.paths) return [];
+    const endpoints: { name: string; status: "Healthy" | "Warning" | "Critical"; details: string; Icon: any }[] = [];
+    Object.keys(spec.paths).forEach(path => {
+        const pathMethods = spec.paths![path] as OpenAPIV3.PathItemObject;
+        Object.keys(pathMethods).forEach(method => {
+            if (['get', 'post', 'put', 'delete', 'patch'].includes(method.toLowerCase())) {
+                endpoints.push({
+                    name: `${method.toUpperCase()} ${path}`,
+                    status: "Healthy", // Default status
+                    details: "Nominal operation",
+                    Icon: Icons.Network, // Default icon
+                });
+            }
+        });
+    });
+    return endpoints.slice(0, 5); // Limit for display
+  }, [spec]);
+
+  useEffect(() => {
+    setSystemHealthData(extractEndpoints());
+    // Reset metrics when spec changes
+    setMemoryUsageData(generateLineChartData(7, 30, 70, 'stable', 10));
+    setCpuUsageData(generateLineChartData(7, 20, 60, 'stable', 8));
+    setResponseTimeData(generateLineChartData(7, 50, 300, 'stable', 50));
+    setErrorRateData(generateLineChartData(7, 0, 5, 'stable', 1));
+    setAnomalyData([]); // Clear anomalies
+  }, [spec, extractEndpoints]);
 
 
   const stopSimulation = useCallback(() => {
@@ -84,14 +101,18 @@ export function ApiDashboard() {
     setIsSimulating(false);
   }, [simulationIntervalId]);
 
-  const startSimulation = () => {
-    stopSimulation(); // Clear any existing interval
+  const startSimulation = (scenario: string = "Memory Leak Simulation") => {
+    stopSimulation(); 
+    setCurrentScenario(scenario);
     setIsSimulating(true);
     setSimulationTimeElapsed(0);
+    setAnomalyData([]); // Clear previous anomalies
     
-    // Slightly alter metric data to show change
-    setMemoryUsageData(prev => prev.map(d => ({...d, value: Math.min(100, d.value + Math.random() * 10)})));
-    setErrorRateData(prev => prev.map(d => ({...d, value: Math.min(20, d.value + Math.random() * 2)})));
+    // Initial kick for data
+    setMemoryUsageData(generateLineChartData(7, 30, (scenario.includes("Memory Leak") ? 50: 70) ));
+    setCpuUsageData(generateLineChartData(7, 20, (scenario.includes("CPU Spike") ? 70: 60)));
+    setResponseTimeData(generateLineChartData(7, 50, (scenario.includes("Latency Increase") ? 400: 300)));
+    setErrorRateData(generateLineChartData(7, 0, (scenario.includes("Error Spike") ? 15: 5)));
 
 
     const intervalId = setInterval(() => {
@@ -99,47 +120,95 @@ export function ApiDashboard() {
         const nextTime = prev + 1;
         if (nextTime >= MAX_SIMULATION_SECONDS) {
           stopSimulation();
-          toast({ title: "Simulation Ended", description: `${currentScenario} completed.` });
+          setTimeout(() => {
+            toast({ title: "Simulation Ended", description: `${currentScenario} completed.` });
+          }, 0);
           return MAX_SIMULATION_SECONDS;
         }
-        // Example: Make memory usage creep up during "Memory Leak"
-        if (currentScenario.includes("Memory Leak")) {
-          setMemoryUsageData(prevData => {
-            const newData = [...prevData];
-            const lastVal = newData[newData.length - 1].value;
-            newData.push({ name: `T+${nextTime}`, value: Math.min(100, lastVal + Math.random() * 2 + 1)});
-            return newData.slice(-7); // Keep last 7 points
-          });
+        
+        // Update metrics based on scenario
+        if (scenario.includes("Memory Leak")) {
+          setMemoryUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, d[d.length-1].value + (Math.random() * 2 + 1) * (nextTime/MAX_SIMULATION_SECONDS*2) ) }]);
+          if (nextTime > MAX_SIMULATION_SECONDS / 2 && memoryUsageData[memoryUsageData.length-1].value > 75) {
+             setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("Memory Usage")) ? anomalies : [...anomalies, {title: "Memory Usage Anomaly", description: "Memory usage critically high.", severity: "High", timestamp: new Date().toLocaleString()}]);
+          }
+        } else {
+          setMemoryUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,30,70,'stable',10)[0].value }]);
         }
+
+        if (scenario.includes("CPU Spike") && nextTime > 5 && nextTime < 15) { // Spike for a period
+           setCpuUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, 60 + Math.random() * 30) }]);
+           if (cpuUsageData[cpuUsageData.length-1].value > 80) {
+             setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("CPU Usage")) ? anomalies : [...anomalies, {title: "CPU Usage Anomaly", description: "CPU usage spiked.", severity: "Medium", timestamp: new Date().toLocaleString()}]);
+           }
+        } else {
+           setCpuUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,20,60,'stable',8)[0].value }]);
+        }
+        
+        if (scenario.includes("Latency Increase")) {
+            setResponseTimeData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(1000, d[d.length-1].value + (Math.random() * 20 + 5) * (nextTime/MAX_SIMULATION_SECONDS*1.5) ) }]);
+        } else {
+            setResponseTimeData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,50,300,'stable',50)[0].value }]);
+        }
+
+        if (scenario.includes("Error Spike")) {
+            setErrorRateData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, d[d.length-1].value + (Math.random() * 1 + 0.5) * (nextTime/MAX_SIMULATION_SECONDS*2) ) }]);
+            if (errorRateData[errorRateData.length-1].value > 10) {
+                 setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("Error Rate")) ? anomalies : [...anomalies, {title: "Elevated Error Rate", description: "Error rate significantly increased.", severity: "High", timestamp: new Date().toLocaleString()}]);
+            }
+        } else {
+            setErrorRateData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,0,5,'stable',1)[0].value }]);
+        }
+
+
+        // Update system health data illustratively
+        setSystemHealthData(prevHealth => prevHealth.map(item => {
+            if (scenario.includes("Error Spike") && item.name.includes("POST") && Math.random() < 0.3) {
+                return {...item, status: "Critical", details: "High error rate on transactions"};
+            }
+            if (scenario.includes("Memory Leak") && Math.random() < 0.2) {
+                 return {...item, status: "Warning", details: "Memory usage increasing"};
+            }
+            return {...item, status: "Healthy", details: "Nominal operation"};
+        }));
+
         return nextTime;
       });
     }, 1000);
     setSimulationIntervalId(intervalId);
-    toast({ title: "Simulation Started", description: `Running ${currentScenario}.` });
+    setTimeout(() => {
+        toast({ title: "Simulation Started", description: `Running ${scenario}.` });
+    }, 0);
   };
 
-  const handleToggleSimulation = () => {
+  const handleToggleSimulation = (scenario?: string) => {
     if (isSimulating) {
       stopSimulation();
-      toast({ title: "Simulation Paused" });
+      setTimeout(() => {
+        toast({ title: "Simulation Paused" });
+      }, 0);
     } else {
-      startSimulation();
+      startSimulation(scenario || "Normal Operation");
     }
   };
 
   const handleResetSimulation = () => {
     stopSimulation();
     setSimulationTimeElapsed(0);
-    // Reset metrics to initial state or re-generate
-    setMemoryUsageData(generateLineChartData());
-    setCpuUsageData(generateLineChartData());
-    setResponseTimeData(generateLineChartData(7).map(d => ({...d, value: Math.floor(Math.random() * (300 - 50 + 1) + 50)})));
-    setErrorRateData(generateLineChartData(7).map(d => ({...d, value: parseFloat((Math.random() * 5).toFixed(1)) })));
-    toast({ title: "Simulation Reset" });
+    setCurrentScenario("Normal Operation");
+    setMemoryUsageData(generateLineChartData(7, 30, 70));
+    setCpuUsageData(generateLineChartData(7, 20, 60));
+    setResponseTimeData(generateLineChartData(7, 50, 300));
+    setErrorRateData(generateLineChartData(7, 0, 5));
+    setSystemHealthData(extractEndpoints());
+    setAnomalyData([]);
+    setTimeout(() => {
+        toast({ title: "Simulation Reset" });
+    }, 0);
   };
 
   useEffect(() => {
-    return () => { // Cleanup on unmount
+    return () => { 
       stopSimulation();
     };
   }, [stopSimulation]);
@@ -167,7 +236,7 @@ export function ApiDashboard() {
     );
   }
 
-  if (!spec) {
+  if (!spec || !rawSpec) {
     return (
       <Card className="w-full shadow-lg">
         <CardHeader>
@@ -214,6 +283,15 @@ export function ApiDashboard() {
   const { info } = spec;
   const simulationProgressPercent = (simulationTimeElapsed / MAX_SIMULATION_SECONDS) * 100;
 
+  const simulationScenarios = [
+    "Normal Operation",
+    "Memory Leak Simulation",
+    "CPU Spike Simulation",
+    "Latency Increase Simulation",
+    "Error Spike Simulation",
+  ];
+
+
   return (
     <div className="space-y-6">
       <Card className="shadow-lg overflow-hidden">
@@ -236,6 +314,24 @@ export function ApiDashboard() {
             <CardDescription className="text-xs">Simulate API degradation scenarios.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+             <div className="space-y-2">
+                <p className="text-sm font-medium">Select Scenario:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {simulationScenarios.map(scenario => (
+                    <Button 
+                        key={scenario} 
+                        onClick={() => handleToggleSimulation(scenario)} 
+                        variant={currentScenario === scenario && isSimulating ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs"
+                        disabled={isSimulating && currentScenario !== scenario}
+                    >
+                        {isSimulating && currentScenario === scenario ? <Icons.PauseCircle className="mr-2 h-4 w-4" /> : <Icons.PlayCircle className="mr-2 h-4 w-4" />}
+                        {scenario.replace(" Simulation", "")}
+                    </Button>
+                ))}
+                </div>
+            </div>
             <div className="space-y-1">
               <div className="flex justify-between items-center text-sm">
                 <span>Simulation Time</span>
@@ -243,20 +339,18 @@ export function ApiDashboard() {
               </div>
               <Progress value={simulationProgressPercent} className="h-2" />
             </div>
-            <div className="space-y-1">
-              <p className="text-sm">Scenario: <span className="font-semibold">{currentScenario}</span></p>
-              <p className="text-xs text-muted-foreground">Simulates various API health scenarios.</p>
-            </div>
+             <p className="text-sm">Current: <span className="font-semibold">{currentScenario}</span> {isSimulating ? "(Running)" : "(Paused/Stopped)"}</p>
+            
             <div className="flex gap-2">
-              <Button onClick={handleToggleSimulation} variant={isSimulating ? "destructive" : "default"} className="w-full">
+               <Button onClick={() => handleToggleSimulation(currentScenario)} variant={isSimulating ? "destructive" : "default"} className="w-full" size="sm">
                 {isSimulating ? (
-                  <><Icons.PauseCircle className="mr-2 h-4 w-4" /> Pause Simulation</>
+                  <><Icons.PauseCircle className="mr-2 h-4 w-4" /> Pause Current</>
                 ) : (
-                  <><Icons.PlayCircle className="mr-2 h-4 w-4" /> Start Simulation</>
+                  <><Icons.PlayCircle className="mr-2 h-4 w-4" /> Resume/Start Current</>
                 )}
               </Button>
-              <Button onClick={handleResetSimulation} variant="outline" className="w-full" disabled={isSimulating && simulationTimeElapsed === 0}>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" /> Reset Simulation
+              <Button onClick={handleResetSimulation} variant="outline" className="w-full" size="sm" disabled={isSimulating && simulationTimeElapsed === 0}>
+                <Icons.RefreshCw className="mr-2 h-4 w-4" /> Reset All
               </Button>
             </div>
           </CardContent>
@@ -265,14 +359,16 @@ export function ApiDashboard() {
         <Card className="lg:col-span-2 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-medium flex items-center">
-              <Icons.ClipboardList className="w-5 h-5 mr-2 text-primary" /> System Health (Illustrative)
+              <Icons.ClipboardList className="w-5 h-5 mr-2 text-primary" /> System Health (Endpoints from Spec)
             </CardTitle>
-            <CardDescription className="text-xs">Example status of monitored systems.</CardDescription>
+            <CardDescription className="text-xs">Status of monitored API endpoints. Limited to first 5 for display.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 max-h-72 overflow-y-auto">
-            {exampleSystemHealthData.map((item) => (
+            {systemHealthData.length > 0 ? systemHealthData.map((item) => (
               <SystemHealthItem key={item.name} {...item} />
-            ))}
+            )) : (
+                <p className="text-sm text-muted-foreground p-4 text-center">No endpoints found or loaded from specification.</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -287,7 +383,7 @@ export function ApiDashboard() {
         <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <MetricCard 
             title="Memory Usage" 
-            value={memoryUsageData[memoryUsageData.length - 1].value} 
+            value={memoryUsageData.length > 0 ? memoryUsageData[memoryUsageData.length - 1].value : 0} 
             unit="%" 
             chartData={memoryUsageData} 
             chartColorKey="memory" 
@@ -297,7 +393,7 @@ export function ApiDashboard() {
           />
           <MetricCard 
             title="CPU Usage" 
-            value={cpuUsageData[cpuUsageData.length -1].value} 
+            value={cpuUsageData.length > 0 ? cpuUsageData[cpuUsageData.length -1].value : 0} 
             unit="%" 
             chartData={cpuUsageData} 
             chartColorKey="cpu" 
@@ -307,7 +403,7 @@ export function ApiDashboard() {
           />
           <MetricCard 
             title="Response Time" 
-            value={responseTimeData[responseTimeData.length - 1].value} 
+            value={responseTimeData.length > 0 ? responseTimeData[responseTimeData.length - 1].value : 0} 
             unit="ms" 
             chartData={responseTimeData} 
             chartColorKey="response" 
@@ -317,7 +413,7 @@ export function ApiDashboard() {
           />
           <MetricCard 
             title="Error Rate" 
-            value={errorRateData[errorRateData.length - 1].value} 
+            value={errorRateData.length > 0 ? errorRateData[errorRateData.length - 1].value : 0} 
             unit="%" 
             chartData={errorRateData} 
             chartColorKey="error" 
@@ -331,20 +427,20 @@ export function ApiDashboard() {
       <Card className="shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle className="text-xl font-semibold flex items-center">
-            <Icons.Zap className="w-6 h-6 mr-2 text-primary" /> Anomaly Detection (Illustrative)
+            <Icons.Zap className="w-6 h-6 mr-2 text-primary" /> Anomaly Detection (Simulated)
           </CardTitle>
-          <CardDescription>Example of detected anomalies and recommended actions.</CardDescription>
+          <CardDescription>Detected anomalies based on simulated metric thresholds.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {exampleAnomalyData.length > 0 ? (
-            exampleAnomalyData.map((anomaly, index) => (
+          {anomalyData.length > 0 ? (
+            anomalyData.map((anomaly, index) => (
               <AnomalyItem key={index} {...anomaly} />
             ))
           ) : (
             <Alert>
               <Icons.CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>No Anomalies Detected (Illustrative)</AlertTitle>
-              <AlertDescription>All example systems are operating within normal parameters.</AlertDescription>
+              <AlertTitle>No Anomalies Detected (Simulated)</AlertTitle>
+              <AlertDescription>All simulated systems are operating within normal parameters based on current thresholds.</AlertDescription>
             </Alert>
           )}
         </CardContent>

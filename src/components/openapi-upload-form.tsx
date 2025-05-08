@@ -32,7 +32,35 @@ const formSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("file"),
-    file: z.instanceof(FileList).refine((files) => files?.length === 1, "File is required."),
+    file: z.any()
+      .refine((value): value is FileList => {
+        if (typeof window === 'undefined') {
+          // Always pass server-side validation for this check,
+          // as FileList is a browser-specific API.
+          return true;
+        }
+        return value instanceof FileList;
+      }, {
+        message: "Invalid file input. Expected a FileList.",
+      })
+      .refine((value) => {
+        if (typeof window === 'undefined') {
+          return true;
+        }
+        // This check assumes value is FileList due to previous refinement on client
+        return value?.length === 1;
+      }, {
+        message: "Please upload exactly one file.",
+      })
+      .refine((value) => {
+         if (typeof window === 'undefined') {
+          return true;
+        }
+        // This check assumes value is FileList and has one item
+        return value?.[0] instanceof File;
+      }, {
+        message: "The uploaded item must be a valid file.",
+      }),
   }),
 ]);
 
@@ -60,6 +88,7 @@ export function OpenApiUploadForm() {
         rawSpecText = YAML.dump(specObject);
         fileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
       } else {
+        // At this point, client-side Zod validation has ensured data.file is a FileList with one File.
         const file = data.file[0];
         fileName = file.name;
         rawSpecText = await file.text();
@@ -148,14 +177,18 @@ export function OpenApiUploadForm() {
                 <FormField
                   control={form.control}
                   name="file"
-                  render={({ field }) => (
+                  render={({ field }) => ( // field.onChange will receive FileList from input
                     <FormItem>
                       <FormLabel>Specification File</FormLabel>
                       <FormControl>
                         <Input 
                           type="file" 
-                          accept=".json,.yaml,.yml" 
+                          accept=".json,.yaml,.yml"
+                          // react-hook-form's onChange expects the event or FileList
                           onChange={(e) => field.onChange(e.target.files)}
+                          ref={field.ref} // Ensure ref is passed for RHF to manage the input
+                          name={field.name} // Ensure name is passed
+                          onBlur={field.onBlur} // Ensure onBlur is passed
                         />
                       </FormControl>
                       <FormDescription>
@@ -176,7 +209,9 @@ export function OpenApiUploadForm() {
               </Button>
             </form>
           </Form>
-        </TabsContent>
+        </Tabs>
+      </CardContent>
     </Card>
   );
 }
+

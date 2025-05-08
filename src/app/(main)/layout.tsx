@@ -12,7 +12,7 @@ export default function MainAppLayout({
     <AuthGuard>
       <div className="flex min-h-screen w-full flex-col bg-background">
         <AppSidebar />
-        {/* Adjust pl-16 to pl-60 for wider sidebar */}
+        {/* Adjust pl-60 to pl-56 for slightly narrower sidebar if desired, or keep based on AppSidebar's w-60 */}
         <div className="flex flex-col sm:pl-60"> 
           <AppHeader />
           <main className="flex-1 p-4 sm:p-6 md:p-8">

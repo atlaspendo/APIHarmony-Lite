@@ -36,8 +36,20 @@ import {
   HeartPulse,  
   ShieldCheck, 
   Gavel,
-  LogIn, // Added
-  LogOut, // Added
+  LogIn,
+  LogOut,
+  Cpu,
+  MemoryStick,
+  GaugeCircle,
+  AlertOctagon,
+  SlidersHorizontal,
+  ClipboardList,
+  Lightbulb,
+  LineChart,
+  PauseCircle,
+  RefreshCw,
+  Maximize,
+  Palette, // For Pattern Intelligence or general design
 } from 'lucide-react';
 
 export const Icons = {
@@ -78,6 +90,18 @@ export const Icons = {
   Gavel,
   LogIn,
   LogOut,
+  Cpu,
+  MemoryStick,
+  GaugeCircle,
+  AlertOctagon,
+  SlidersHorizontal,
+  ClipboardList,
+  Lightbulb,
+  LineChart,
+  PauseCircle,
+  RefreshCw,
+  Maximize,
+  Palette,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

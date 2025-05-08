@@ -2,7 +2,7 @@
 "use client";
 
 import { useOpenApiStore } from "@/stores/openapi-store";
-import type { OpenAPIV3 } from 'openapi-types';
+import type { OpenAPI, OpenAPIV3, OpenAPIV2 } from 'openapi-types';
 import {
   Card,
   CardContent,
@@ -24,6 +24,17 @@ interface SchemaUsage {
   operations: { path: string; method: string; type: 'requestBody' | 'response' }[];
   referencedBySchemas: string[]; // Schemas that reference this schema
 }
+
+// Helper to check if it's an OpenAPI V3 document
+function isOpenAPIV3(doc: OpenAPI.Document | null | undefined): doc is OpenAPIV3.Document {
+  return !!doc && 'openapi' in doc && typeof doc.openapi === 'string' && doc.openapi.startsWith('3.');
+}
+
+// Helper to check if it's an OpenAPI V2 document (Swagger)
+function isOpenAPIV2(doc: OpenAPI.Document | null | undefined): doc is OpenAPIV2.Document {
+  return !!doc && 'swagger' in doc && typeof doc.swagger === 'string' && doc.swagger.startsWith('2.');
+}
+
 
 export function DependencyGraphViewer() {
   const { spec, error: specError } = useOpenApiStore();
@@ -61,43 +72,54 @@ export function DependencyGraphViewer() {
     );
   }
 
-  // This component primarily supports OpenAPI V3 for detailed dependency analysis.
-  if (!('openapi' in spec && spec.openapi.startsWith('3.'))) {
+  const isV3 = isOpenAPIV3(spec);
+  const isV2 = isOpenAPIV2(spec);
+
+  if (!isV3 && !isV2) {
     return (
       <Card className="w-full shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Icons.Info />Unsupported Specification Version</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Icons.Info />Unsupported Specification Format</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Dependency graph analysis is currently optimized for OpenAPI V3 specifications.
+            Dependency graph analysis currently supports OpenAPI V3 and V2 specifications. The loaded specification is not recognized as either.
           </p>
         </CardContent>
       </Card>
     );
   }
-  const v3Spec = spec as OpenAPIV3.Document;
 
   const schemaUsageMap = new Map<string, SchemaUsage>();
+  let schemasContainer: Record<string, OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject | OpenAPIV2.SchemaObject | OpenAPIV2.ReferenceObject> | undefined;
+  let refPrefix: string;
+
+  if (isV3) {
+    schemasContainer = (spec as OpenAPIV3.Document).components?.schemas;
+    refPrefix = '#/components/schemas/';
+  } else { // isV2
+    schemasContainer = (spec as OpenAPIV2.Document).definitions;
+    refPrefix = '#/definitions/';
+  }
 
   // Initialize map
-  if (v3Spec.components?.schemas) {
-    for (const schemaName in v3Spec.components.schemas) {
+  if (schemasContainer) {
+    for (const schemaName in schemasContainer) {
       schemaUsageMap.set(schemaName, { operations: [], referencedBySchemas: [] });
     }
   }
 
   // Helper to find $ref values
-  const findRefs = (obj: any, currentSchemaName?: string): string[] => {
+  const findRefs = (obj: any, currentSchemaName?: string, currentRefPrefix?: string): string[] => {
+    const effectiveRefPrefix = currentRefPrefix || refPrefix; // Use passed prefix or default
     const refs: string[] = [];
     if (typeof obj === 'object' && obj !== null) {
       for (const key in obj) {
         if (key === '$ref' && typeof obj[key] === 'string') {
           const refPath = obj[key] as string;
-          if (refPath.startsWith('#/components/schemas/')) {
-            const refSchemaName = refPath.substring('#/components/schemas/'.length);
+          if (refPath.startsWith(effectiveRefPrefix)) {
+            const refSchemaName = refPath.substring(effectiveRefPrefix.length);
             refs.push(refSchemaName);
-            // If we are analyzing a specific schema's properties, record the dependency
             if (currentSchemaName && schemaUsageMap.has(refSchemaName)) {
                 const referencedSchemaEntry = schemaUsageMap.get(refSchemaName)!;
                 if (!referencedSchemaEntry.referencedBySchemas.includes(currentSchemaName)){
@@ -106,7 +128,7 @@ export function DependencyGraphViewer() {
             }
           }
         } else {
-          refs.push(...findRefs(obj[key], currentSchemaName));
+          refs.push(...findRefs(obj[key], currentSchemaName, currentRefPrefix));
         }
       }
     }
@@ -114,53 +136,84 @@ export function DependencyGraphViewer() {
   };
   
   // Analyze schema properties for inter-schema references
-  if (v3Spec.components?.schemas) {
-    for (const schemaName in v3Spec.components.schemas) {
-        const schemaObject = v3Spec.components.schemas[schemaName];
-        findRefs(schemaObject, schemaName);
+  if (schemasContainer) {
+    for (const schemaName in schemasContainer) {
+        const schemaObject = schemasContainer[schemaName];
+        findRefs(schemaObject, schemaName, refPrefix);
     }
   }
 
-
   // Analyze paths for schema usage
-  if (v3Spec.paths) {
-    for (const path in v3Spec.paths) {
-      const pathItem = v3Spec.paths[path];
+  if (spec.paths) {
+    for (const path in spec.paths) {
+      const pathItem = spec.paths[path] as OpenAPIV3.PathItemObject | OpenAPIV2.PathItemObject; // Type assertion
       if (!pathItem) continue;
+
       for (const method in pathItem) {
         if (!['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'].includes(method.toLowerCase())) continue;
         
-        const operation = pathItem[method as keyof OpenAPIV3.PathItemObject] as OpenAPIV3.OperationObject;
-        if (!operation) continue;
+        const operation = pathItem[method as keyof typeof pathItem];
+        if (!operation || typeof operation !== 'object' || !('responses' in operation)) continue; // Basic check for operation structure
 
-        // Check requestBody
-        if (operation.requestBody && 'content' in operation.requestBody) {
-          for (const contentType in operation.requestBody.content) {
-            const mediaType = operation.requestBody.content[contentType];
-            if (mediaType.schema) {
-              findRefs(mediaType.schema).forEach(refSchemaName => {
-                if (schemaUsageMap.has(refSchemaName)) {
-                  schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'requestBody' });
-                }
-              });
+        if (isV3) {
+          const v3Operation = operation as OpenAPIV3.OperationObject;
+          // Check requestBody for V3
+          if (v3Operation.requestBody && 'content' in v3Operation.requestBody) {
+            for (const contentType in v3Operation.requestBody.content) {
+              const mediaType = v3Operation.requestBody.content[contentType];
+              if (mediaType.schema) {
+                findRefs(mediaType.schema, undefined, refPrefix).forEach(refSchemaName => {
+                  if (schemaUsageMap.has(refSchemaName)) {
+                    schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'requestBody' });
+                  }
+                });
+              }
             }
           }
-        }
-
-        // Check responses
-        if (operation.responses) {
-          for (const statusCode in operation.responses) {
-            const response = operation.responses[statusCode];
-            if (response && 'content' in response) {
-              for (const contentType in response.content) {
-                const mediaType = response.content[contentType];
-                if (mediaType.schema) {
-                  findRefs(mediaType.schema).forEach(refSchemaName => {
-                    if (schemaUsageMap.has(refSchemaName)) {
-                      schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'response' });
-                    }
-                  });
+          // Check responses for V3
+          if (v3Operation.responses) {
+            for (const statusCode in v3Operation.responses) {
+              const response = v3Operation.responses[statusCode];
+              if (response && 'content' in response && response.content) {
+                for (const contentType in response.content) {
+                  const mediaType = response.content[contentType];
+                  if (mediaType.schema) {
+                    findRefs(mediaType.schema, undefined, refPrefix).forEach(refSchemaName => {
+                      if (schemaUsageMap.has(refSchemaName)) {
+                        schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'response' });
+                      }
+                    });
+                  }
                 }
+              }
+            }
+          }
+        } else { // isV2
+          const v2Operation = operation as OpenAPIV2.OperationObject;
+          // Check parameters for requestBody (V2 style)
+          if (v2Operation.parameters) {
+            for (const param of v2Operation.parameters) {
+              // Parameter can be ReferenceObject or ParameterObject
+              if (!('$ref' in param) && param.in === 'body' && param.schema) {
+                findRefs(param.schema, undefined, refPrefix).forEach(refSchemaName => {
+                  if (schemaUsageMap.has(refSchemaName)) {
+                    schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'requestBody' });
+                  }
+                });
+              }
+            }
+          }
+          // Check responses for V2
+          if (v2Operation.responses) {
+            for (const statusCode in v2Operation.responses) {
+              const response = v2Operation.responses[statusCode];
+               // Response can be ReferenceObject or ResponseObject
+              if (response && !('$ref' in response) && response.schema) {
+                findRefs(response.schema, undefined, refPrefix).forEach(refSchemaName => {
+                  if (schemaUsageMap.has(refSchemaName)) {
+                    schemaUsageMap.get(refSchemaName)!.operations.push({ path, method, type: 'response' });
+                  }
+                });
               }
             }
           }
@@ -180,13 +233,13 @@ export function DependencyGraphViewer() {
           <Icons.GitFork className="w-6 h-6 text-primary" /> API Schema Dependencies
         </CardTitle>
         <CardDescription>
-          Shows how schemas defined in <code>components/schemas</code> are used by operations or other schemas.
-          A full visual graph is complex; this provides a list-based view of relationships.
+          Shows how schemas (from <code>components/schemas</code> for V3 or <code>definitions</code> for V2) are used by operations or other schemas.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!hasDependencies && <p className="text-muted-foreground">No schema dependencies found or no schemas defined in components.</p>}
-        {hasDependencies && (
+        {!schemasContainer && <p className="text-muted-foreground">No schemas found in the specification (expected in {isV3 ? 'components/schemas' : 'definitions'}).</p>}
+        {schemasContainer && !hasDependencies && <p className="text-muted-foreground">No schema dependencies found among the defined schemas.</p>}
+        {schemasContainer && hasDependencies && (
           <ScrollArea className="h-[600px]">
             <Accordion type="multiple" className="w-full space-y-2">
               {Array.from(schemaUsageMap.entries()).map(([schemaName, usage]) => (

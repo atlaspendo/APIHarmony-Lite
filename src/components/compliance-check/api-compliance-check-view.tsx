@@ -1,11 +1,11 @@
-
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useOpenApiStore } from "@/stores/openapi-store";
-import { checkApiCompliance, type CheckApiComplianceOutput, CheckApiComplianceInputSchema, type CheckApiComplianceInput } from "@/ai/flows/api-compliance-check";
+import { CheckApiComplianceInputSchema, type CheckApiComplianceInput } from "@/ai/schemas/api-compliance-schemas";
+import { checkApiCompliance, type CheckApiComplianceOutput } from "@/ai/flows/api-compliance-check";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";

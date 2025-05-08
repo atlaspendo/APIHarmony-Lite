@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { generateApiDocumentation, type GenerateApiDocumentationOutput, GenerateApiDocumentationInputSchema, type GenerateApiDocumentationInput } from "@/ai/flows/api-documentation-generation";
+import { GenerateApiDocumentationInputSchema, type GenerateApiDocumentationInput } from "@/ai/schemas/api-documentation-schemas";
+import { generateApiDocumentation, type GenerateApiDocumentationOutput } from "@/ai/flows/api-documentation-generation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";

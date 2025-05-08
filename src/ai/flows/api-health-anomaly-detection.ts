@@ -3,27 +3,15 @@
  * @fileOverview API Health Anomaly Detection AI agent.
  *
  * - analyzeApiHealth - A function that handles the API health analysis.
- * - AnalyzeApiHealthInput - The input type for the analyzeApiHealth function.
+ * - AnalyzeApiHealthInput - The input type for the analyzeApiHealth function (imported).
  * - AnalyzeApiHealthOutput - The return type for the analyzeApiHealth function.
- * - AnalyzeApiHealthInputSchema - The Zod schema for the input.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
+import { AnalyzeApiHealthInputSchema, type AnalyzeApiHealthInput } from '@/ai/schemas/api-health-schemas';
 
-export const AnalyzeApiHealthInputSchema = z.object({
-  apiLogs: z
-    .string()
-    .optional()
-    .describe('Multiline text of API logs, or a JSON array of log objects. Include timestamps, status codes, messages, and relevant context if possible.'),
-  metricsData: z
-    .string()
-    .optional()
-    .describe('JSON string representing timeseries metrics data. For example: [{timestamp: "YYYY-MM-DDTHH:mm:ssZ", latency_ms: 120, error_rate: 0.05, throughput_rpm: 500}, ...]. Ensure at least one of logs or metrics is provided.'),
-}).refine(data => data.apiLogs || data.metricsData, {
-  message: "Either API logs or metrics data must be provided.",
-});
-export type AnalyzeApiHealthInput = z.infer<typeof AnalyzeApiHealthInputSchema>;
+// AnalyzeApiHealthInputSchema and AnalyzeApiHealthInput type are now imported.
 
 const AnalyzeApiHealthOutputSchema = z.object({
   anomalies: z
@@ -54,11 +42,6 @@ const AnalyzeApiHealthOutputSchema = z.object({
 export type AnalyzeApiHealthOutput = z.infer<typeof AnalyzeApiHealthOutputSchema>;
 
 export async function analyzeApiHealth(input: AnalyzeApiHealthInput): Promise<AnalyzeApiHealthOutput> {
-  if (!input.apiLogs && !input.metricsData) {
-    // This explicit check might be redundant if Zod's refine is correctly triggered
-    // by Genkit's flow input validation, but it's a safe fallback.
-    throw new Error("Either API logs or metrics data must be provided.");
-  }
   return analyzeApiHealthFlow(input);
 }
 

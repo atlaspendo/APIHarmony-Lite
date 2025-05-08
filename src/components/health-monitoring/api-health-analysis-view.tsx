@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { analyzeApiHealth, type AnalyzeApiHealthOutput, AnalyzeApiHealthInputSchema, type AnalyzeApiHealthInput } from "@/ai/flows/api-health-anomaly-detection";
+import { AnalyzeApiHealthInputSchema, type AnalyzeApiHealthInput } from "@/ai/schemas/api-health-schemas";
+import { analyzeApiHealth, type AnalyzeApiHealthOutput } from "@/ai/flows/api-health-anomaly-detection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";

@@ -3,23 +3,15 @@
  * @fileOverview API Compliance Check AI agent.
  *
  * - checkApiCompliance - A function that handles the API compliance check process.
- * - CheckApiComplianceInput - The input type for the checkApiCompliance function.
+ * - CheckApiComplianceInput - The input type for the checkApiCompliance function (imported).
  * - CheckApiComplianceOutput - The return type for the checkApiCompliance function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
+import { CheckApiComplianceInputSchema, type CheckApiComplianceInput } from '@/ai/schemas/api-compliance-schemas';
 
-const CheckApiComplianceInputSchema = z.object({
-  openApiSpec: z
-    .string()
-    .describe('The OpenAPI specification (YAML or JSON string) to analyze for compliance.'),
-  complianceProfile: z
-    .enum(["GENERAL", "PII_ öffentlich", "FINANCIAL_BASIC"])
-    .default("GENERAL")
-    .describe('The compliance profile to check against. "GENERAL" checks for common best practices. "PII_ öffentlich" focuses on publicly identifiable information. "FINANCIAL_BASIC" for basic financial data rules.'),
-});
-export type CheckApiComplianceInput = z.infer<typeof CheckApiComplianceInputSchema>;
+// CheckApiComplianceInputSchema and CheckApiComplianceInput type are now imported.
 
 const CheckApiComplianceOutputSchema = z.object({
   checksPerformed: z

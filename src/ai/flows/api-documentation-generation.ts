@@ -3,25 +3,15 @@
  * @fileOverview API Documentation Generation AI agent.
  *
  * - generateApiDocumentation - A function that handles the API documentation generation process.
- * - GenerateApiDocumentationInput - The input type for the generateApiDocumentation function.
+ * - GenerateApiDocumentationInput - The input type for the generateApiDocumentation function (imported).
  * - GenerateApiDocumentationOutput - The return type for the generateApiDocumentation function.
- * - GenerateApiDocumentationInputSchema - The Zod schema for the input.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
+import { GenerateApiDocumentationInputSchema, type GenerateApiDocumentationInput } from '@/ai/schemas/api-documentation-schemas';
 
-export const GenerateApiDocumentationInputSchema = z.object({
-  description: z
-    .string()
-    .min(50, { message: "Description must be at least 50 characters long."})
-    .describe('A natural language description of the API, its purpose, and its intended endpoints/functionality.'),
-  partialSpec: z
-    .string()
-    .optional()
-    .describe('An optional partial OpenAPI specification (YAML or JSON string) to be completed or enhanced.'),
-});
-export type GenerateApiDocumentationInput = z.infer<typeof GenerateApiDocumentationInputSchema>;
+// GenerateApiDocumentationInputSchema and GenerateApiDocumentationInput type are now imported.
 
 const GenerateApiDocumentationOutputSchema = z.object({
   generatedSpec: z

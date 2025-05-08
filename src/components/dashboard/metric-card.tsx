@@ -2,7 +2,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { Line, LineChart as RechartsLineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Area, Line, LineChart as RechartsLineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import type { LucideIcon } from "lucide-react";
@@ -12,26 +12,27 @@ interface MetricCardProps {
   value: string | number;
   unit?: string;
   chartData: { name: string; value: number }[];
-  chartColor: keyof typeof chartConfig; // e.g., "memory"
+  chartColor: string; // e.g., "memory", "cpu". Used as a key in propChartConfig.
   Icon: LucideIcon;
-  chartConfig: ChartConfig;
+  chartConfig: ChartConfig; // This is propChartConfig, e.g., metricsChartConfig from dashboard
   description?: string;
 }
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-1))",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig
-
 export function MetricCard({ title, value, unit, chartData, chartColor, Icon, chartConfig: propChartConfig, description }: MetricCardProps) {
   
-  const activeChartConfig = propChartConfig || chartConfig;
+  // The actual color string, e.g., "hsl(var(--chart-1))" for memory
+  const actualColorString = propChartConfig[chartColor]?.color;
+
+  // ChartContainer's 'config' prop expects keys to match the 'dataKey' of Line/Area elements.
+  // Our dataKey for Line/Area is "value".
+  const chartDisplayConfig: ChartConfig = {
+    value: { 
+      label: title, // Used by ChartTooltipContent
+      color: actualColorString, 
+    },
+  };
+
+  const gradientId = `gradient-${chartColor.toString().replace(/\s+/g, '-')}`;
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow">
@@ -49,38 +50,57 @@ export function MetricCard({ title, value, unit, chartData, chartColor, Icon, ch
          {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
       </CardHeader>
       <CardContent>
-        <ChartContainer config={activeChartConfig} className="h-[100px] w-full">
+        <ChartContainer config={chartDisplayConfig} className="h-[100px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RechartsLineChart
               data={chartData}
-              margin={{ top: 5, right: 10, left: -25, bottom: 0 }} // Adjusted left margin
+              margin={{ top: 5, right: 10, left: -25, bottom: 0 }} 
             >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  {/* var(--color-value) will be defined by ChartStyle from chartDisplayConfig.value.color */}
+                  <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="var(--color-value)" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.5)" />
               <XAxis
                 dataKey="name"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) => value.slice(0,3)} // Shorten labels if needed
-                className="text-xs"
+                tickFormatter={(val) => val.slice(0,3)} 
+                className="text-xs fill-muted-foreground"
               />
               <YAxis 
                 tickLine={false} 
                 axisLine={false} 
                 tickMargin={5} 
-                className="text-xs"
-                width={30} // Explicit width for YAxis labels
+                className="text-xs fill-muted-foreground"
+                width={30} 
               />
               <Tooltip
-                cursor={false}
-                content={<ChartTooltipContent hideLabel className="text-xs" indicator="line" />}
+                cursor={{ stroke: actualColorString, strokeWidth: 1, strokeDasharray: "3 3" }}
+                labelFormatter={(label) => <div className="font-semibold text-foreground">{label}</div>} // For T-0, T-1 label
+                content={<ChartTooltipContent
+                            className="text-xs shadow-lg" // Ensure good visibility
+                            indicator="line" // "dot" or "line"
+                            // itemSorter={(item) => item.name === 'value' ? -1 : 1} // If multiple series
+                          />}
               />
               <Line
                 dataKey="value"
                 type="monotone"
-                stroke={`hsl(var(--chart-${chartColor as string}))`}
-                strokeWidth={2}
+                stroke="var(--color-value)" 
+                strokeWidth={2.5}
                 dot={false}
+                activeDot={{ r: 5, strokeWidth: 1, fill: "var(--color-value)", stroke: "hsl(var(--background))" }}
+              />
+              <Area
+                dataKey="value"
+                type="monotone"
+                fill={`url(#${gradientId})`}
+                stroke="none"
               />
             </RechartsLineChart>
           </ResponsiveContainer>

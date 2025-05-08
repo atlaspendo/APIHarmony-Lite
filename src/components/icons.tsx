@@ -28,8 +28,14 @@ import {
   ArrowRightCircle,
   Edit3,
   Edit,
-  Home, // Added Home
-  ListChecks, // Added ListChecks
+  Home, 
+  ListChecks,
+  FilePlus2, // Added for Generate Documentation
+  FileOutput,  // Alternative for Generate Documentation
+  Activity,    // Added for Health Monitoring
+  HeartPulse,  // Alternative for Health Monitoring
+  ShieldCheck, // Added for Compliance Check
+  Gavel,       // Alternative for Compliance Check
 } from 'lucide-react';
 
 export const Icons = {
@@ -62,6 +68,12 @@ export const Icons = {
   Network,
   Home,
   ListChecks,
+  FilePlus2,
+  FileOutput,
+  Activity,
+  HeartPulse,
+  ShieldCheck,
+  Gavel,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

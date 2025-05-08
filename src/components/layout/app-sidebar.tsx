@@ -11,10 +11,14 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 const navItems = [
   { href: "/", label: "Home / Import", icon: Icons.Home },
   { href: "/dashboard", label: "API Dashboard", icon: Icons.LayoutDashboard },
-  { href: "/documentation", label: "API Documentation", icon: Icons.BookOpen },
+  { href: "/generate-documentation", label: "Generate Documentation", icon: Icons.FilePlus2 },
+  { href: "/documentation", label: "View API Documentation", icon: Icons.BookOpen },
   { href: "/dependency-graph", label: "Dependency Graph", icon: Icons.GitFork },
+  { href: "/integration-analysis", label: "Integration Analysis", icon: Icons.ListChecks },
+  { href: "/health-monitoring", label: "Health Monitoring", icon: Icons.Activity },
   { href: "/vulnerability-scan", label: "Vulnerability Scan", icon: Icons.ShieldAlert },
-  { href: "/pattern-analysis", label: "Pattern Analysis", icon: Icons.ListChecks },
+  { href: "/compliance-check", label: "Compliance Check", icon: Icons.ShieldCheck },
+  // { href: "/settings", label: "Settings", icon: Icons.Settings }, // Example for future use
 ];
 
 export function AppSidebar() {

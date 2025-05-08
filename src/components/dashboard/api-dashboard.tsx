@@ -168,21 +168,30 @@ export function ApiDashboard() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Navigate to other analytical sections.</CardDescription>
+          <CardTitle>Quick Actions & Analysis</CardTitle>
+          <CardDescription>Navigate to other analytical sections of API Harmony Lite.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2 md:grid-cols-4">
-          <Button asChild variant="outline">
-            <Link href="/documentation"><Icons.BookOpen className="mr-2"/>View Documentation</Link>
+        <CardContent className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+          <Button asChild variant="outline" className="justify-start text-left">
+            <Link href="/generate-documentation"><Icons.FilePlus2 className="mr-2"/>Generate Documentation</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="justify-start text-left">
+            <Link href="/documentation"><Icons.BookOpen className="mr-2"/>View Loaded Documentation</Link>
+          </Button>
+          <Button asChild variant="outline" className="justify-start text-left">
             <Link href="/dependency-graph"><Icons.GitFork className="mr-2"/>Explore Dependencies</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="justify-start text-left">
+            <Link href="/integration-analysis"><Icons.ListChecks className="mr-2"/>Integration Analysis</Link>
+          </Button>
+           <Button asChild variant="outline" className="justify-start text-left">
+            <Link href="/health-monitoring"><Icons.Activity className="mr-2"/>Health Monitoring</Link>
+          </Button>
+          <Button asChild variant="outline" className="justify-start text-left">
             <Link href="/vulnerability-scan"><Icons.ShieldAlert className="mr-2"/>Run Vulnerability Scan</Link>
           </Button>
-          <Button asChild variant="outline">
-            <Link href="/pattern-analysis"><Icons.ListChecks className="mr-2"/>Analyze Patterns</Link>
+          <Button asChild variant="outline" className="justify-start text-left">
+            <Link href="/compliance-check"><Icons.ShieldCheck className="mr-2"/>Compliance Check</Link>
           </Button>
         </CardContent>
       </Card>

@@ -12,16 +12,16 @@ interface MetricCardProps {
   value: string | number;
   unit?: string;
   chartData: { name: string; value: number }[];
-  chartColor: string; // e.g., "memory", "cpu". Used as a key in propChartConfig.
+  chartColorKey: string; // e.g., "memory", "cpu". Used as a key in propChartConfig.
   Icon: LucideIcon;
   chartConfig: ChartConfig; // This is propChartConfig, e.g., metricsChartConfig from dashboard
   description?: string;
 }
 
-export function MetricCard({ title, value, unit, chartData, chartColor, Icon, chartConfig: propChartConfig, description }: MetricCardProps) {
+export function MetricCard({ title, value, unit, chartData, chartColorKey, Icon, chartConfig: propChartConfig, description }: MetricCardProps) {
   
   // The actual color string, e.g., "hsl(var(--chart-1))" for memory
-  const actualColorString = propChartConfig[chartColor]?.color;
+  const actualColorString = propChartConfig[chartColorKey]?.color;
 
   // ChartContainer's 'config' prop expects keys to match the 'dataKey' of Line/Area elements.
   // Our dataKey for Line/Area is "value".
@@ -32,7 +32,7 @@ export function MetricCard({ title, value, unit, chartData, chartColor, Icon, ch
     },
   };
 
-  const gradientId = `gradient-${chartColor.toString().replace(/\s+/g, '-')}`;
+  const gradientId = `gradient-${chartColorKey.toString().replace(/\s+/g, '-')}`;
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow">
@@ -109,3 +109,5 @@ export function MetricCard({ title, value, unit, chartData, chartColor, Icon, ch
     </Card>
   );
 }
+
+    

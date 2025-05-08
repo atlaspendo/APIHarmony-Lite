@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { MetricCard } from "./metric-card";
 import { SystemHealthItem } from "./system-health-item";
 import { AnomalyItem } from "./anomaly-item";
-import type { ChartConfig } from "@/components/ui/chart"; // Import ChartConfig type
+import type { ChartConfig } from "@/components/ui/chart"; 
 
 // Placeholder data for charts
 const generateLineChartData = (points = 7) => {
@@ -67,7 +67,11 @@ export function ApiDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-destructive-foreground bg-destructive p-3 rounded-md">{specError}</p>
+          <Alert variant="destructive">
+            <Icons.AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Failed to Load Specification</AlertTitle>
+            <AlertDescription>{specError}</AlertDescription>
+          </Alert>
           <p className="mt-4 text-sm">
             Please try importing the specification again via the <Link href="/" className="underline text-primary hover:text-primary/80">Import page</Link>.
           </p>
@@ -90,6 +94,32 @@ export function ApiDashboard() {
               Please import an OpenAPI specification using the <Link href="/" className="underline text-primary hover:text-primary/80">Import page</Link> to view the dashboard.
             </AlertDescription>
           </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Robust check for spec.info and its required properties
+  if (!spec.info || typeof spec.info.title === 'undefined' || typeof spec.info.version === 'undefined') {
+    return (
+      <Card className="w-full shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Icons.AlertTriangle /> Malformed API Specification
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <Icons.AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Invalid Specification Structure</AlertTitle>
+            <AlertDescription>
+              The loaded API specification is missing essential 'info' (title/version).
+              Please check the spec file: {fileName || 'Unknown file'}.
+            </AlertDescription>
+          </Alert>
+           <p className="mt-4 text-sm">
+            Try importing the specification again via the <Link href="/" className="underline text-primary hover:text-primary/80">Import page</Link>.
+          </p>
         </CardContent>
       </Card>
     );
@@ -171,7 +201,7 @@ export function ApiDashboard() {
             value={memoryUsageData[memoryUsageData.length - 1].value} 
             unit="%" 
             chartData={memoryUsageData} 
-            chartColor="memory" 
+            chartColorKey="memory" 
             Icon={Icons.MemoryStick}
             chartConfig={metricsChartConfig}
             description="Current RAM utilization"
@@ -181,7 +211,7 @@ export function ApiDashboard() {
             value={cpuUsageData[cpuUsageData.length -1].value} 
             unit="%" 
             chartData={cpuUsageData} 
-            chartColor="cpu" 
+            chartColorKey="cpu" 
             Icon={Icons.Cpu}
             chartConfig={metricsChartConfig}
             description="Current processor load"
@@ -191,7 +221,7 @@ export function ApiDashboard() {
             value={responseTimeData[responseTimeData.length - 1].value} 
             unit="ms" 
             chartData={responseTimeData} 
-            chartColor="response" 
+            chartColorKey="response" 
             Icon={Icons.GaugeCircle}
             chartConfig={metricsChartConfig}
             description="Average API response latency"
@@ -201,7 +231,7 @@ export function ApiDashboard() {
             value={errorRateData[errorRateData.length - 1].value} 
             unit="%" 
             chartData={errorRateData} 
-            chartColor="error" 
+            chartColorKey="error" 
             Icon={Icons.AlertOctagon}
             chartConfig={metricsChartConfig}
             description="Percentage of failed requests"
@@ -234,3 +264,5 @@ export function ApiDashboard() {
     </div>
   );
 }
+
+    

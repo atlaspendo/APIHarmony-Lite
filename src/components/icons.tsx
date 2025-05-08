@@ -47,10 +47,11 @@ import {
   Lightbulb,
   LineChart,
   PauseCircle,
-  PlayCircle, // Added icon
+  PlayCircle,
   RefreshCw,
   Maximize,
   Palette, // For Pattern Intelligence or general design
+  Search, // Added Search icon
 } from 'lucide-react';
 
 export const Icons = {
@@ -100,10 +101,11 @@ export const Icons = {
   Lightbulb,
   LineChart,
   PauseCircle,
-  PlayCircle, // Added icon
+  PlayCircle,
   RefreshCw,
   Maximize,
   Palette,
+  Search, // Added Search icon
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

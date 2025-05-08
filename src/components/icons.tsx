@@ -47,6 +47,7 @@ import {
   Lightbulb,
   LineChart,
   PauseCircle,
+  PlayCircle, // Added icon
   RefreshCw,
   Maximize,
   Palette, // For Pattern Intelligence or general design
@@ -99,6 +100,7 @@ export const Icons = {
   Lightbulb,
   LineChart,
   PauseCircle,
+  PlayCircle, // Added icon
   RefreshCw,
   Maximize,
   Palette,

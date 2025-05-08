@@ -1,9 +1,10 @@
-
 'use server';
 
 import { prisma } from '@/lib/prisma';
 import type { OpenApiSpec } from '@prisma/client'; // Prisma generated type
 import { Prisma } from '@prisma/client'; // Import Prisma for error types
+
+const OPENSSL_ERROR_MESSAGE = "Database connection failed: The required OpenSSL library (libssl.so.1.1 or compatible) is missing. Please install it on your system. This library is essential for Prisma to connect. Also, verify your DATABASE_URL in .env and check server logs for more context if the issue persists after installing OpenSSL.";
 
 export async function saveOpenApiSpec(
   name: string,
@@ -32,9 +33,7 @@ export async function saveOpenApiSpec(
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
       if (error.message.includes('libssl') || error.message.includes('openssl')) {
-        throw new Error(
-            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}). Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
-        );
+        throw new Error(OPENSSL_ERROR_MESSAGE);
       }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}) while saving. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
@@ -76,9 +75,7 @@ export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
       if (error.message.includes('libssl') || error.message.includes('openssl')) {
-        throw new Error(
-            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}). Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
-        );
+         throw new Error(OPENSSL_ERROR_MESSAGE);
       }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}). Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
@@ -118,9 +115,7 @@ export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null
       );
     } else if (error instanceof Prisma.PrismaClientInitializationError) {
       if (error.message.includes('libssl') || error.message.includes('openssl')) {
-        throw new Error(
-            `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
-        );
+        throw new Error(OPENSSL_ERROR_MESSAGE);
       }
       throw new Error(
         `Database connection failed (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
@@ -162,9 +157,7 @@ export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
           );
         } else if (error instanceof Prisma.PrismaClientInitializationError) {
           if (error.message.includes('libssl') || error.message.includes('openssl')) {
-            throw new Error(
-                `Database connection failed due to a missing OpenSSL library (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Please ensure OpenSSL (specifically libssl.so.1.1 or a compatible version) is installed on your system. Check your DATABASE_URL in .env and server logs.`
-            );
+            throw new Error(OPENSSL_ERROR_MESSAGE);
           }
           throw new Error(
             `Database connection failed (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`

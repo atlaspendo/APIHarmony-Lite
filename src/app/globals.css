@@ -5,16 +5,16 @@
 
 @layer base {
   :root {
-    --background: 0 0% 96%; /* Light gray #F5F5F5 */
-    --foreground: 240 10% 3.9%; /* Darker text for better contrast on light gray */
+    --background: 220 30% 96%; /* Very light blue, almost white */
+    --foreground: 240 10% 3.9%; /* Darker text */
     
-    --card: 0 0% 100%; /* White cards */
-    --card-foreground: 240 10% 3.9%;
+    --card: 90 70% 92%; /* Light Yellow-Green for UI cards */
+    --card-foreground: 120 30% 25%; /* Darker Green text for cards */
     
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover: 90 70% 92%; /* Light Yellow-Green for popovers */
+    --popover-foreground: 120 30% 25%; /* Darker Green text for popovers */
     
-    --primary: 235 62% 29%; /* Dark blue #1A237E */
+    --primary: 210 70% 50%; /* Strong Blue (Enterprise Systems, Core Engine Outline) */
     --primary-foreground: 0 0% 98%; /* White */
     
     --secondary: 220 13% 91%; /* A slightly darker gray for secondary elements */
@@ -23,46 +23,48 @@
     --muted: 220 9% 84%; /* Muted gray */
     --muted-foreground: 220 9% 45%; /* Darker muted text */
     
-    --accent: 187 100% 38%; /* Teal #00ACC1 */
-    --accent-foreground: 0 0% 98%; /* White for good contrast on Teal */
+    --accent: 330 80% 65%; /* Pink/Magenta (API Gateway color) */
+    --accent-foreground: 0 0% 98%; /* White for good contrast on Accent */
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 220 13% 88%;
-    --input: 220 13% 88%; /* Match border for consistency */
-    --ring: 187 100% 38%; /* Teal for rings */
+    --border: 220 13% 80%; /* Adjusted for new card colors */
+    --input: 220 13% 80%; 
+    --ring: 210 70% 50%; /* Primary blue for rings */
     
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Chart colors based on engine components */
+    --chart-1: 140 60% 45%; /* Discovery Engine Green */
+    --chart-2: 35 85% 60%;  /* Pattern Intelligence Orange */
+    --chart-3: 175 65% 45%; /* Health Monitor Teal */
+    --chart-4: 260 70% 65%; /* ML Models Purple */
+    --chart-5: 200 60% 55%; /* Graph Database Blue / Other */
     
     --radius: 0.5rem;
 
-    /* Sidebar Specific Theme */
-    --sidebar-background: 235 55% 20%; /* Darker variant of primary for sidebar */
-    --sidebar-foreground: 0 0% 90%; /* Light text for sidebar */
-    --sidebar-primary: 187 100% 38%; /* Teal for active/primary elements in sidebar */
-    --sidebar-primary-foreground: 0 0% 98%; /* White */
-    --sidebar-accent: 235 50% 30%; /* Slightly lighter primary for hover/accent */
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 235 50% 15%;
-    --sidebar-ring: 187 100% 45%;
+    /* Sidebar Specific Theme (Core Engine Block styling) */
+    --sidebar-background: 240 40% 25%; /* Dark Blue/Purple */
+    --sidebar-foreground: 240 10% 85%; /* Light text for sidebar */
+    --sidebar-primary: 90 70% 92%; /* Light Yellow-Green (active item, matches UI cards) */
+    --sidebar-primary-foreground: 240 40% 15%; /* Dark text for active item */
+    --sidebar-accent: 240 30% 35%; /* Slightly lighter/muted blue for hover */
+    --sidebar-accent-foreground: 240 10% 90%;
+    --sidebar-border: 240 40% 20%;
+    --sidebar-ring: 90 70% 85%; /* Ring for sidebar elements, matching active color */
   }
 
   .dark {
+    /* TODO: Define dark theme based on new palette if needed, for now mirroring light changes */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 240 5% 12%; /* Darker version of light yellow-green */
+    --card-foreground: 90 50% 80%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 5% 12%;
+    --popover-foreground: 90 50% 80%;
 
-    --primary: 0 0% 98%;
+    --primary: 210 70% 60%; /* Lighter blue for dark mode primary */
     --primary-foreground: 240 5.9% 10%;
 
     --secondary: 240 3.7% 15.9%;
@@ -71,7 +73,7 @@
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
 
-    --accent: 240 3.7% 15.9%;
+    --accent: 330 80% 70%; /* Lighter pink for dark mode accent */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -79,17 +81,17 @@
 
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --ring: 210 70% 60%;
 
     /* Dark Sidebar Specific Theme */
-    --sidebar-background: 240 5.9% 10%; 
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 187 100% 38%; 
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4% 20%;
-    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-background: 240 10% 10%; 
+    --sidebar-foreground: 240 10% 85%;
+    --sidebar-primary: 90 40% 25%; 
+    --sidebar-primary-foreground: 90 70% 92%;
+    --sidebar-accent: 240 5% 20%;
+    --sidebar-accent-foreground: 240 10% 90%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 187 100% 45%;
+    --sidebar-ring: 90 40% 30%;
   }
 }
 

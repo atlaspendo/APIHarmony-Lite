@@ -28,6 +28,8 @@ import {
   ArrowRightCircle,
   Edit3,
   Edit,
+  Home, // Added Home
+  ListChecks, // Added ListChecks
 } from 'lucide-react';
 
 export const Icons = {
@@ -58,6 +60,8 @@ export const Icons = {
   HttpPatch: Edit,
   HttpGet: ArrowRightCircle, 
   Network,
+  Home,
+  ListChecks,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

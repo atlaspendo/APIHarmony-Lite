@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 const navItems = [
-  { href: "/", label: "Import OpenAPI", icon: Icons.UploadCloud },
+  { href: "/", label: "Home / Import", icon: Icons.Home },
+  { href: "/dashboard", label: "API Dashboard", icon: Icons.LayoutDashboard },
   { href: "/documentation", label: "API Documentation", icon: Icons.BookOpen },
   { href: "/dependency-graph", label: "Dependency Graph", icon: Icons.GitFork },
   { href: "/vulnerability-scan", label: "Vulnerability Scan", icon: Icons.ShieldAlert },
+  { href: "/pattern-analysis", label: "Pattern Analysis", icon: Icons.ListChecks },
 ];
 
 export function AppSidebar() {

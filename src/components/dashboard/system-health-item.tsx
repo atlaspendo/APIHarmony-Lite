@@ -4,6 +4,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SystemHealthItemProps {
   name: string;
@@ -53,3 +54,4 @@ export function SystemHealthItem({ name, status, details, Icon = Icons.Server }:
     </div>
   );
 }
+

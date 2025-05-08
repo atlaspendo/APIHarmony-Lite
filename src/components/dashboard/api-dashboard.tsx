@@ -14,7 +14,7 @@ import { AnomalyItem } from "./anomaly-item";
 import type { ChartConfig } from "@/components/ui/chart"; 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { OpenAPIV3 } from 'openapi-types';
+import type { OpenAPIV3, OpenAPIV2 } from 'openapi-types';
 
 // Helper to generate somewhat realistic time-series data
 const generateLineChartData = (points = 7, minVal = 20, maxVal = 80, trend: 'up' | 'down' | 'stable' = 'stable', noise = 5) => {
@@ -47,7 +47,7 @@ const metricsChartConfig: ChartConfig = {
 const MAX_SIMULATION_SECONDS = 30;
 
 export function ApiDashboard() {
-  const { spec, fileName, error: specError, rawSpec } = useOpenApiStore();
+  const { spec, fileName, error: specError, rawSpec, activeSpecId } = useOpenApiStore();
   const { toast } = useToast();
 
   const [isSimulating, setIsSimulating] = useState(false);
@@ -62,35 +62,51 @@ export function ApiDashboard() {
   const [systemHealthData, setSystemHealthData] = useState<any[]>([]);
   const [anomalyData, setAnomalyData] = useState<any[]>([]);
 
-
   const extractEndpoints = useCallback(() => {
     if (!spec || !spec.paths) return [];
     const endpoints: { name: string; status: "Healthy" | "Warning" | "Critical"; details: string; Icon: any }[] = [];
-    Object.keys(spec.paths).forEach(path => {
-        const pathMethods = spec.paths![path] as OpenAPIV3.PathItemObject;
-        Object.keys(pathMethods).forEach(method => {
-            if (['get', 'post', 'put', 'delete', 'patch'].includes(method.toLowerCase())) {
-                endpoints.push({
-                    name: `${method.toUpperCase()} ${path}`,
-                    status: "Healthy", // Default status
-                    details: "Nominal operation",
-                    Icon: Icons.Network, // Default icon
-                });
+    try {
+      Object.keys(spec.paths).forEach(path => {
+        const pathItem = spec.paths![path];
+        if (!pathItem) return; // Skip if pathItem is undefined
+        
+        // Type guard for path methods
+        const validMethods = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'] as const;
+        type HttpMethod = typeof validMethods[number];
+
+        for (const method in pathItem) {
+          if (validMethods.includes(method as HttpMethod)) {
+            const operation = pathItem[method as HttpMethod] as (OpenAPIV3.OperationObject | OpenAPIV2.OperationObject);
+            if (operation && typeof operation === 'object') { // Ensure operation is an object
+              endpoints.push({
+                name: `${method.toUpperCase()} ${path}`,
+                status: "Healthy", // Default status
+                details: (operation as any).summary || "Nominal operation", // Use summary if available
+                Icon: Icons.Network, // Default icon
+              });
             }
-        });
-    });
+          }
+        }
+      });
+    } catch (e) {
+      console.error("Error extracting endpoints from spec:", e);
+      return []; // Return empty if an error occurs during extraction
+    }
     return endpoints.slice(0, 5); // Limit for display
   }, [spec]);
 
   useEffect(() => {
     setSystemHealthData(extractEndpoints());
-    // Reset metrics when spec changes
+    // Reset metrics when spec (or its ID, indicating a new spec from DB) changes
     setMemoryUsageData(generateLineChartData(7, 30, 70, 'stable', 10));
     setCpuUsageData(generateLineChartData(7, 20, 60, 'stable', 8));
     setResponseTimeData(generateLineChartData(7, 50, 300, 'stable', 50));
     setErrorRateData(generateLineChartData(7, 0, 5, 'stable', 1));
     setAnomalyData([]); // Clear anomalies
-  }, [spec, extractEndpoints]);
+    stopSimulation(); // Stop any ongoing simulation
+    setSimulationTimeElapsed(0);
+    setCurrentScenario("Normal Operation");
+  }, [spec, activeSpecId, extractEndpoints]); // Added activeSpecId and extractEndpoints
 
 
   const stopSimulation = useCallback(() => {
@@ -101,46 +117,62 @@ export function ApiDashboard() {
     setIsSimulating(false);
   }, [simulationIntervalId]);
 
+  // Effect for toast notifications related to simulation state changes
+  useEffect(() => {
+    if (isSimulating && simulationTimeElapsed === 0) {
+      toast({ title: "Simulation Started", description: `Running ${currentScenario}.` });
+    } else if (!isSimulating && simulationIntervalId === null && simulationTimeElapsed > 0 && simulationTimeElapsed < MAX_SIMULATION_SECONDS) {
+      // Paused
+      toast({ title: "Simulation Paused" });
+    } else if (!isSimulating && simulationTimeElapsed >= MAX_SIMULATION_SECONDS) {
+      // Completed
+       toast({ title: "Simulation Ended", description: `${currentScenario} completed.` });
+    }
+  }, [isSimulating, simulationTimeElapsed, currentScenario, toast, simulationIntervalId]);
+
+
   const startSimulation = (scenario: string = "Memory Leak Simulation") => {
     stopSimulation(); 
     setCurrentScenario(scenario);
-    setIsSimulating(true);
-    setSimulationTimeElapsed(0);
-    setAnomalyData([]); // Clear previous anomalies
+    setSimulationTimeElapsed(0); // Reset time for new simulation
+    setAnomalyData([]); 
     
     // Initial kick for data
     setMemoryUsageData(generateLineChartData(7, 30, (scenario.includes("Memory Leak") ? 50: 70) ));
     setCpuUsageData(generateLineChartData(7, 20, (scenario.includes("CPU Spike") ? 70: 60)));
     setResponseTimeData(generateLineChartData(7, 50, (scenario.includes("Latency Increase") ? 400: 300)));
     setErrorRateData(generateLineChartData(7, 0, (scenario.includes("Error Spike") ? 15: 5)));
-
+    
+    setIsSimulating(true); // Set simulating state after resetting time and before interval starts
 
     const intervalId = setInterval(() => {
       setSimulationTimeElapsed(prev => {
         const nextTime = prev + 1;
         if (nextTime >= MAX_SIMULATION_SECONDS) {
           stopSimulation();
-          setTimeout(() => {
-            toast({ title: "Simulation Ended", description: `${currentScenario} completed.` });
-          }, 0);
           return MAX_SIMULATION_SECONDS;
         }
         
-        // Update metrics based on scenario
         if (scenario.includes("Memory Leak")) {
-          setMemoryUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, d[d.length-1].value + (Math.random() * 2 + 1) * (nextTime/MAX_SIMULATION_SECONDS*2) ) }]);
-          if (nextTime > MAX_SIMULATION_SECONDS / 2 && memoryUsageData[memoryUsageData.length-1].value > 75) {
-             setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("Memory Usage")) ? anomalies : [...anomalies, {title: "Memory Usage Anomaly", description: "Memory usage critically high.", severity: "High", timestamp: new Date().toLocaleString()}]);
-          }
+          setMemoryUsageData(d => {
+            const newVal = Math.min(100, d[d.length-1].value + (Math.random() * 2 + 1) * (nextTime/MAX_SIMULATION_SECONDS*2) );
+            if (newVal > 75 && !anomalyData.find(a=>a.title.includes("Memory Usage"))) {
+              setAnomalyData(anomalies => [...anomalies, {title: "Memory Usage Anomaly", description: "Memory usage critically high.", severity: "High", timestamp: new Date().toLocaleString()}]);
+            }
+            return [...d.slice(1), { name: `T+${nextTime}`, value: newVal }];
+          });
         } else {
           setMemoryUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,30,70,'stable',10)[0].value }]);
         }
 
-        if (scenario.includes("CPU Spike") && nextTime > 5 && nextTime < 15) { // Spike for a period
-           setCpuUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, 60 + Math.random() * 30) }]);
-           if (cpuUsageData[cpuUsageData.length-1].value > 80) {
-             setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("CPU Usage")) ? anomalies : [...anomalies, {title: "CPU Usage Anomaly", description: "CPU usage spiked.", severity: "Medium", timestamp: new Date().toLocaleString()}]);
-           }
+        if (scenario.includes("CPU Spike") && nextTime > 5 && nextTime < 15) { 
+           setCpuUsageData(d => {
+            const newVal = Math.min(100, 60 + Math.random() * 30);
+            if (newVal > 80 && !anomalyData.find(a=>a.title.includes("CPU Usage"))) {
+              setAnomalyData(anomalies => [...anomalies, {title: "CPU Usage Anomaly", description: "CPU usage spiked.", severity: "Medium", timestamp: new Date().toLocaleString()}]);
+            }
+            return [...d.slice(1), { name: `T+${nextTime}`, value: newVal }];
+           });
         } else {
            setCpuUsageData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,20,60,'stable',8)[0].value }]);
         }
@@ -152,16 +184,17 @@ export function ApiDashboard() {
         }
 
         if (scenario.includes("Error Spike")) {
-            setErrorRateData(d => [...d.slice(1), { name: `T+${nextTime}`, value: Math.min(100, d[d.length-1].value + (Math.random() * 1 + 0.5) * (nextTime/MAX_SIMULATION_SECONDS*2) ) }]);
-            if (errorRateData[errorRateData.length-1].value > 10) {
-                 setAnomalyData(anomalies => anomalies.find(a=>a.title.includes("Error Rate")) ? anomalies : [...anomalies, {title: "Elevated Error Rate", description: "Error rate significantly increased.", severity: "High", timestamp: new Date().toLocaleString()}]);
-            }
+            setErrorRateData(d => {
+              const newVal = Math.min(100, d[d.length-1].value + (Math.random() * 1 + 0.5) * (nextTime/MAX_SIMULATION_SECONDS*2) );
+              if (newVal > 10 && !anomalyData.find(a=>a.title.includes("Error Rate"))) {
+                setAnomalyData(anomalies => [...anomalies, {title: "Elevated Error Rate", description: "Error rate significantly increased.", severity: "High", timestamp: new Date().toLocaleString()}]);
+              }
+              return [...d.slice(1), { name: `T+${nextTime}`, value: newVal }];
+            });
         } else {
             setErrorRateData(d => [...d.slice(1), { name: `T+${nextTime}`, value: generateLineChartData(1,0,5,'stable',1)[0].value }]);
         }
 
-
-        // Update system health data illustratively
         setSystemHealthData(prevHealth => prevHealth.map(item => {
             if (scenario.includes("Error Spike") && item.name.includes("POST") && Math.random() < 0.3) {
                 return {...item, status: "Critical", details: "High error rate on transactions"};
@@ -176,19 +209,17 @@ export function ApiDashboard() {
       });
     }, 1000);
     setSimulationIntervalId(intervalId);
-    setTimeout(() => {
-        toast({ title: "Simulation Started", description: `Running ${scenario}.` });
-    }, 0);
   };
 
   const handleToggleSimulation = (scenario?: string) => {
     if (isSimulating) {
       stopSimulation();
-      setTimeout(() => {
-        toast({ title: "Simulation Paused" });
-      }, 0);
     } else {
-      startSimulation(scenario || "Normal Operation");
+      if (!spec || !rawSpec) {
+        toast({ title: "No Spec Loaded", description: "Please load an API specification to start simulation.", variant: "destructive"});
+        return;
+      }
+      startSimulation(scenario || currentScenario);
     }
   };
 
@@ -202,9 +233,7 @@ export function ApiDashboard() {
     setErrorRateData(generateLineChartData(7, 0, 5));
     setSystemHealthData(extractEndpoints());
     setAnomalyData([]);
-    setTimeout(() => {
-        toast({ title: "Simulation Reset" });
-    }, 0);
+    toast({ title: "Simulation Reset" });
   };
 
   useEffect(() => {
@@ -301,6 +330,7 @@ export function ApiDashboard() {
           </CardTitle>
           <CardDescription className="text-sm pt-1">
             {fileName ? `File: ${fileName} | ` : ''} Version: {info.version}
+            {activeSpecId && <span className="text-xs text-muted-foreground"> (ID: {activeSpecId.substring(0,8)}...)</span>}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -342,14 +372,14 @@ export function ApiDashboard() {
              <p className="text-sm">Current: <span className="font-semibold">{currentScenario}</span> {isSimulating ? "(Running)" : "(Paused/Stopped)"}</p>
             
             <div className="flex gap-2">
-               <Button onClick={() => handleToggleSimulation(currentScenario)} variant={isSimulating ? "destructive" : "default"} className="w-full" size="sm">
+               <Button onClick={() => handleToggleSimulation()} variant={isSimulating ? "destructive" : "default"} className="w-full" size="sm" disabled={!spec || !rawSpec}>
                 {isSimulating ? (
                   <><Icons.PauseCircle className="mr-2 h-4 w-4" /> Pause Current</>
                 ) : (
-                  <><Icons.PlayCircle className="mr-2 h-4 w-4" /> Resume/Start Current</>
+                  <><Icons.PlayCircle className="mr-2 h-4 w-4" /> Resume/Start</>
                 )}
               </Button>
-              <Button onClick={handleResetSimulation} variant="outline" className="w-full" size="sm" disabled={isSimulating && simulationTimeElapsed === 0}>
+              <Button onClick={handleResetSimulation} variant="outline" className="w-full" size="sm" disabled={simulationTimeElapsed === 0 && !isSimulating}>
                 <Icons.RefreshCw className="mr-2 h-4 w-4" /> Reset All
               </Button>
             </div>

@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model OpenApiSpec {
+  id         String   @id @default(cuid())
+  name       String
+  content    String   @db.Text // Parsed and validated content (e.g., as JSON string)
+  rawContent String   @db.Text // Original raw content (YAML or JSON string)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Optional: to associate specs with users if user accounts are implemented
+  // userId    String?
+  // user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([name])
+  // @@index([userId]) // If user association is added
+}
+
+// Example User model for future authentication integration
+// model User {
+//   id            String        @id @default(cuid())
+//   username      String        @unique
+//   passwordHash  String?       // Store hashed passwords
+//   createdAt     DateTime      @default(now())
+//   updatedAt     DateTime      @updatedAt
+//   specs         OpenApiSpec[]
+// }

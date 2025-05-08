@@ -24,6 +24,7 @@ import { useOpenApiStore } from "@/stores/openapi-store";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { saveOpenApiSpec } from "@/actions/openapi-actions";
 
 const formSchema = z.discriminatedUnion("type", [
   z.object({
@@ -32,38 +33,16 @@ const formSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("file"),
-    file: z.any()
-      .refine((value): value is FileList => {
-        if (typeof window === 'undefined') {
-          return true;
-        }
-        return value instanceof FileList;
-      }, {
-        message: "Invalid file input. Expected a FileList.",
-      })
-      .refine((value) => {
-        if (typeof window === 'undefined') {
-          return true;
-        }
-        return value?.length === 1;
-      }, {
-        message: "Please upload exactly one file.",
-      })
-      .refine((value) => {
-         if (typeof window === 'undefined') {
-          return true;
-        }
-        return value?.[0] instanceof File;
-      }, {
-        message: "The uploaded item must be a valid file.",
-      }),
+    file: z.custom<FileList>((val) => typeof window !== 'undefined' ? val instanceof FileList : true, "Invalid file input.")
+      .refine((val) => val?.length === 1, "Please upload exactly one file.")
+      .refine((val) => typeof window !== 'undefined' ? val?.[0] instanceof File : true, "Uploaded item must be a file."),
   }),
 ]);
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function OpenApiUploadForm() {
-  const { setSpec, setError, setLoading, isLoading, fileName: currentFileName } = useOpenApiStore();
+export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: string) => void }) {
+  const { setSpec, setError, setLoading, isLoading, fileName: currentFileName, activeSpecId } = useOpenApiStore();
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -76,11 +55,10 @@ export function OpenApiUploadForm() {
     setError(null);
     let specObject: OpenAPI.Document;
     let rawSpecText: string;
-    let fileName: string;
+    let inputFileName: string;
 
     try {
       if (data.type === "url") {
-        // Call the internal API route to fetch the spec
         const response = await fetch('/api/fetch-spec', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -91,39 +69,50 @@ export function OpenApiUploadForm() {
           const errorData = await response.json();
           throw new Error(errorData.error || `Failed to fetch spec from URL: ${response.statusText}`);
         }
-
         const result = await response.json();
         specObject = result.specObject as OpenAPI.Document;
         rawSpecText = result.rawSpecText;
-        fileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
+        inputFileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
       } else {
-        // File upload logic
         const file = data.file[0];
-        fileName = file.name;
+        inputFileName = file.name;
         rawSpecText = await file.text();
         
         let parsedContent;
-        if (fileName.endsWith(".yaml") || fileName.endsWith(".yml")) {
+        if (inputFileName.endsWith(".yaml") || inputFileName.endsWith(".yml")) {
           parsedContent = YAML.load(rawSpecText);
         } else {
           parsedContent = JSON.parse(rawSpecText);
         }
-        // Validate and dereference the parsed content
-        // Using bundle for files too, to handle potential internal/external refs, similar to URL processing
         specObject = (await SwaggerParser.bundle(JSON.parse(JSON.stringify(parsedContent)))) as OpenAPI.Document; 
-        // Re-dump to ensure rawSpecText aligns with potentially modified specObject by SwaggerParser
-        rawSpecText = YAML.dump(specObject);
+        rawSpecText = YAML.dump(specObject); // Ensure rawSpecText matches the bundled spec
       }
 
-      setSpec(specObject, rawSpecText, fileName);
+      // Save to database
+      const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
+      
+      // Update Zustand store with the saved spec (which now has an ID)
+      setSpec({
+        specObject,
+        rawSpecText,
+        name: savedSpec.name,
+        id: savedSpec.id,
+      });
+
       toast({
         title: "Success",
-        description: `OpenAPI spec "${fileName}" loaded and validated.`,
+        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved.`,
         variant: "default",
       });
+      
+      if (onSpecLoaded) {
+        onSpecLoaded(savedSpec.id);
+      }
+      form.reset();
+
     } catch (err: any) {
       console.error("Error processing OpenAPI spec:", err);
-      let errorMessage = "Failed to parse or validate OpenAPI specification.";
+      let errorMessage = "Failed to parse, validate, or save OpenAPI specification.";
       if (err.message) {
         errorMessage = err.message;
       } else if (typeof err === 'string') {
@@ -148,10 +137,10 @@ export function OpenApiUploadForm() {
           Import OpenAPI Specification
         </CardTitle>
         <CardDescription>
-          Upload a file or provide a URL to an OpenAPI (v2 or v3) specification.
+          Upload a file or provide a URL. Imported specs will be saved to the database.
           {currentFileName && (
              <span className="block mt-2 text-sm text-muted-foreground">
-                Currently loaded: <strong className="text-foreground">{currentFileName}</strong>
+                Currently active: <strong className="text-foreground">{currentFileName}</strong> {activeSpecId ? `(ID: ${activeSpecId.substring(0,8)}...)` : ''}
             </span>
           )}
         </CardDescription>
@@ -213,7 +202,7 @@ export function OpenApiUploadForm() {
                 ) : (
                   <Icons.UploadCloud className="mr-2 h-4 w-4" />
                 )}
-                Load Specification
+                Load & Save Specification
               </Button>
             </form>
           </Form>

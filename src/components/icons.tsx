@@ -51,7 +51,7 @@ import {
   RefreshCw,
   Maximize,
   Palette, // For Pattern Intelligence or general design
-  Search, // Added Search icon
+  Search, 
 } from 'lucide-react';
 
 export const Icons = {
@@ -105,7 +105,7 @@ export const Icons = {
   RefreshCw,
   Maximize,
   Palette,
-  Search, // Added Search icon
+  Search,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

@@ -4,13 +4,13 @@
 import { useEffect, useState } from 'react';
 import { OpenApiUploadForm } from "@/components/openapi-upload-form";
 import { useOpenApiStore } from '@/stores/openapi-store';
-import { getOpenApiSpecs, getOpenApiSpecById, deleteOpenApiSpec } from '@/actions/openapi-actions';
-import type { OpenApiSpec as PrismaOpenApiSpec } from '@prisma/client';
+import { getOpenApiSpecs, getOpenApiSpecById, deleteOpenApiSpec, type OpenApiSpec } from '@/actions/openapi-actions'; // Updated import
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
-import SwaggerParser from "@apidevtools/swagger-parser";
+// SwaggerParser and OpenAPI types are still needed for parsing/validation logic if OpenApiUploadForm keeps it.
+// import SwaggerParser from "@apidevtools/swagger-parser"; 
 import type { OpenAPI } from 'openapi-types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
@@ -28,7 +28,7 @@ import {
 
 export default function ImportOpenApiPage() {
   const { setSpec, setLoading, setError: setStoreError, clear: clearActiveSpec } = useOpenApiStore();
-  const [savedSpecs, setSavedSpecs] = useState<PrismaOpenApiSpec[]>([]);
+  const [savedSpecs, setSavedSpecs] = useState<OpenApiSpec[]>([]); // Use local OpenApiSpec type
   const [isLoadingList, setIsLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -36,62 +36,78 @@ export default function ImportOpenApiPage() {
   const fetchSpecs = async () => {
     setIsLoadingList(true);
     setListError(null);
-    try {
-      const specs = await getOpenApiSpecs();
-      setSavedSpecs(specs);
-    } catch (error: any) {
-      console.error("Failed to fetch saved specs:", error);
-      setListError(error.message || "Could not load saved specifications.");
-      toast({ title: "Error Loading Specs", description: error.message, variant: "destructive" });
-    } finally {
-      setIsLoadingList(false);
+    if (typeof window !== 'undefined') { // Ensure localStorage is available
+      try {
+        const specs = await getOpenApiSpecs();
+        setSavedSpecs(specs);
+      } catch (error: any) {
+        console.error("Failed to fetch saved specs:", error);
+        setListError(error.message || "Could not load saved specifications.");
+        toast({ title: "Error Loading Specs", description: error.message, variant: "destructive" });
+      } finally {
+        setIsLoadingList(false);
+      }
+    } else {
+      // Handle case where localStorage is not available (e.g. initial SSR, though actions are server-side)
+      // For this demo, we'll assume client-side interaction for localStorage.
+      setIsLoadingList(false); 
+      // setListError("Local storage is not available to load specifications.");
     }
   };
 
   useEffect(() => {
-    fetchSpecs();
+    // Fetch specs only on client-side where localStorage is available
+    if (typeof window !== 'undefined') {
+      fetchSpecs();
+    }
   }, []);
 
   const handleLoadSpec = async (specId: string) => {
     setLoading(true);
-    try {
-      const dbSpec = await getOpenApiSpecById(specId);
-      if (dbSpec) {
-        // The stored 'content' is the parsed spec as a JSON string.
-        // The 'rawContent' is the original YAML/JSON.
-        const specObject = JSON.parse(dbSpec.content) as OpenAPI.Document;
+    if (typeof window !== 'undefined') {
+      try {
+        const dbSpec = await getOpenApiSpecById(specId);
+        if (dbSpec) {
+          const specObject = JSON.parse(dbSpec.content) as OpenAPI.Document;
 
-        setSpec({
-          specObject,
-          rawSpecText: dbSpec.rawContent,
-          name: dbSpec.name,
-          id: dbSpec.id,
-        });
-        toast({ title: "Specification Loaded", description: `Activated "${dbSpec.name}".` });
-      } else {
-        throw new Error("Specification not found in database.");
+          setSpec({
+            specObject,
+            rawSpecText: dbSpec.rawContent,
+            name: dbSpec.name,
+            id: dbSpec.id,
+          });
+          toast({ title: "Specification Loaded", description: `Activated "${dbSpec.name}".` });
+        } else {
+          throw new Error("Specification not found.");
+        }
+      } catch (error: any) {
+        console.error("Failed to load spec:", error);
+        setStoreError(error.message || "Could not load the selected specification.");
+        toast({ title: "Error Loading Spec", description: error.message, variant: "destructive" });
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error("Failed to load spec:", error);
-      setStoreError(error.message || "Could not load the selected specification.");
-      toast({ title: "Error Loading Spec", description: error.message, variant: "destructive" });
-    } finally {
+    } else {
       setLoading(false);
+      toast({ title: "Error", description: "Cannot load specs on the server.", variant: "destructive"});
     }
   };
   
   const handleDeleteSpec = async (specId: string) => {
-    try {
-      await deleteOpenApiSpec(specId);
-      toast({ title: "Specification Deleted", description: `Successfully deleted the specification.` });
-      fetchSpecs(); // Refresh the list
-      // If the deleted spec was the active one, clear it
-      if (useOpenApiStore.getState().activeSpecId === specId) {
-        clearActiveSpec();
+    if (typeof window !== 'undefined') {
+      try {
+        await deleteOpenApiSpec(specId);
+        toast({ title: "Specification Deleted", description: `Successfully deleted the specification.` });
+        fetchSpecs(); 
+        if (useOpenApiStore.getState().activeSpecId === specId) {
+          clearActiveSpec();
+        }
+      } catch (error: any) {
+        console.error("Failed to delete spec:", error);
+        toast({ title: "Error Deleting Spec", description: error.message, variant: "destructive" });
       }
-    } catch (error: any) {
-      console.error("Failed to delete spec:", error);
-      toast({ title: "Error Deleting Spec", description: error.message, variant: "destructive" });
+    } else {
+       toast({ title: "Error", description: "Cannot delete specs on the server.", variant: "destructive"});
     }
   };
 
@@ -106,7 +122,7 @@ export default function ImportOpenApiPage() {
             <Icons.ListChecks className="w-5 h-5 text-primary" /> Saved API Specifications
           </CardTitle>
           <CardDescription>
-            Manage and load your previously imported API specifications.
+            Manage and load your previously imported API specifications (stored in browser).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -147,7 +163,7 @@ export default function ImportOpenApiPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the API specification named "{spec.name}".
+                              This action cannot be undone. This will permanently delete the API specification named "{spec.name}" from your browser's local storage.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

@@ -1,10 +1,35 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
-import type { OpenApiSpec } from '@prisma/client'; // Prisma generated type
-import { Prisma } from '@prisma/client'; // Import Prisma for error types
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 
-const OPENSSL_ERROR_MESSAGE = "Database connection failed: The required OpenSSL library (libssl.so.1.1 or compatible) is missing. Please install it on your system. This library is essential for Prisma to connect. Also, verify your DATABASE_URL in .env and check server logs for more context if the issue persists after installing OpenSSL.";
+// Define a local OpenApiSpec type as Prisma is removed
+export interface OpenApiSpec {
+  id: string;
+  name: string;
+  content: string; // JSON string of the parsed spec
+  rawContent: string; // Original YAML or JSON string
+  createdAt: string; // ISO string date
+  updatedAt: string; // ISO string date
+}
+
+const LOCAL_STORAGE_KEY = 'apiHarmonyLiteSpecs';
+
+// Helper function to get specs from localStorage
+const getSpecsFromLocalStorage = (): OpenApiSpec[] => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return []; // localStorage not available (e.g., during SSR for actions)
+  }
+  const specsJson = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+  return specsJson ? JSON.parse(specsJson) : [];
+};
+
+// Helper function to save specs to localStorage
+const saveSpecsToLocalStorage = (specs: OpenApiSpec[]): void => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(specs));
+};
 
 export async function saveOpenApiSpec(
   name: string,
@@ -12,169 +37,59 @@ export async function saveOpenApiSpec(
   rawContent: string // The original YAML or JSON string
 ): Promise<OpenApiSpec> {
   try {
-    const newSpec = await prisma.openApiSpec.create({
-      data: {
-        name,
-        content,
-        rawContent,
-      },
-    });
+    const specs = getSpecsFromLocalStorage();
+    const now = new Date().toISOString();
+    const newSpec: OpenApiSpec = {
+      id: uuidv4(),
+      name,
+      content,
+      rawContent,
+      createdAt: now,
+      updatedAt: now,
+    };
+    specs.push(newSpec);
+    saveSpecsToLocalStorage(specs);
     return newSpec;
   } catch (error: any) {
-    console.error('Error saving OpenAPI spec:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2021' || error.code === 'P1003') {
-        throw new Error(
-          'Database or table not found. Please ensure migrations have been run: `npx prisma migrate dev` and the database is accessible.'
-        );
-      }
-      throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while saving the OpenAPI specification. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
-      );
-    } else if (error instanceof Prisma.PrismaClientInitializationError) {
-      if (error.message.includes('libssl') || error.message.includes('openssl')) {
-        throw new Error(OPENSSL_ERROR_MESSAGE);
-      }
-      throw new Error(
-        `Database connection failed (Prisma Initialization Error: ${error.message}) while saving. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
-      );
-    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
-        throw new Error(
-            `A critical Prisma engine error occurred (Rust Panic) while saving. Please check server logs for details. Details: ${error.message}`
-        );
-    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-        throw new Error(
-            `An unknown Prisma database error occurred while saving. Please check server logs for details. Details: ${error.message}`
-        );
-    }
-    const errorMessage = error.message || 'An unknown issue occurred.';
-    throw new Error(
-      `An unexpected error occurred while saving the OpenAPI specification to the database. Details: ${errorMessage}. Check server logs for more.`
-    );
+    console.error('Error saving OpenAPI spec to localStorage:', error);
+    throw new Error(`Failed to save OpenAPI spec: ${error.message}`);
   }
 }
 
 export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
   try {
-    const specs = await prisma.openApiSpec.findMany({
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    });
-    return specs;
+    const specs = getSpecsFromLocalStorage();
+    // Sort by updatedAt descending
+    return specs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   } catch (error: any) {
-    console.error('Error fetching OpenAPI specs:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2021' || error.code === 'P1003') {
-        throw new Error(
-          'Database or table not found. Please ensure migrations have been run: `npx prisma migrate dev` and the database is accessible.'
-        );
-      }
-      throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specifications. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
-      );
-    } else if (error instanceof Prisma.PrismaClientInitializationError) {
-      if (error.message.includes('libssl') || error.message.includes('openssl')) {
-         throw new Error(OPENSSL_ERROR_MESSAGE);
-      }
-      throw new Error(
-        `Database connection failed (Prisma Initialization Error: ${error.message}). Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
-      );
-    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
-        throw new Error(
-            `A critical Prisma engine error occurred (Rust Panic). Please check server logs for details. Details: ${error.message}`
-        );
-    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-        throw new Error(
-            `An unknown Prisma database error occurred. Please check server logs for details. Details: ${error.message}`
-        );
-    }
-    const errorMessage = error.message || 'An unknown issue occurred.';
-    throw new Error(
-      `An unexpected error occurred while fetching OpenAPI specifications from the database. Details: ${errorMessage}. Check server logs for more.`
-    );
+    console.error('Error fetching OpenAPI specs from localStorage:', error);
+    throw new Error(`Failed to fetch OpenAPI specs: ${error.message}`);
   }
 }
 
 export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null> {
   try {
-    const spec = await prisma.openApiSpec.findUnique({
-      where: { id },
-    });
+    const specs = getSpecsFromLocalStorage();
+    const spec = specs.find((s) => s.id === id) || null;
     return spec;
   } catch (error: any) {
-    console.error(`Error fetching OpenAPI spec with ID ${id}:`, error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2021' || error.code === 'P1003') {
-        throw new Error(
-          `Database or table not found when fetching spec ID ${id}. Ensure migrations are run: \`npx prisma migrate dev\` and the database is accessible.`
-        );
-      }
-      throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
-      );
-    } else if (error instanceof Prisma.PrismaClientInitializationError) {
-      if (error.message.includes('libssl') || error.message.includes('openssl')) {
-        throw new Error(OPENSSL_ERROR_MESSAGE);
-      }
-      throw new Error(
-        `Database connection failed (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
-      );
-    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
-        throw new Error(
-            `A critical Prisma engine error occurred (Rust Panic) while fetching spec ID ${id}. Please check server logs for details. Details: ${error.message}`
-        );
-    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-        throw new Error(
-            `An unknown Prisma database error occurred while fetching spec ID ${id}. Please check server logs for details. Details: ${error.message}`
-        );
-    }
-    const errorMessage = error.message || 'An unknown issue occurred.';
-    throw new Error(
-      `An unexpected error occurred while fetching OpenAPI specification (ID: ${id}) from the database. Details: ${errorMessage}. Check server logs for more.`
-    );
+    console.error(`Error fetching OpenAPI spec with ID ${id} from localStorage:`, error);
+    throw new Error(`Failed to fetch OpenAPI spec by ID: ${error.message}`);
   }
 }
 
 export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
-    try {
-        const deletedSpec = await prisma.openApiSpec.delete({
-            where: { id },
-        });
-        return deletedSpec;
-    } catch (error: any) {
-        console.error(`Error deleting OpenAPI spec with ID ${id}:`, error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-          if (error.code === 'P2021' || error.code === 'P1003') {
-            throw new Error(
-              `Database or table not found when deleting spec ID ${id}. Ensure migrations are run: \`npx prisma migrate dev\` and the database is accessible.`
-            );
-          } else if (error.code === 'P2025') { // Record to delete not found
-             throw new Error(`OpenAPI specification with ID ${id} not found for deletion.`);
-          }
-          throw new Error(
-            `A Prisma error occurred (Code: ${error.code}) while deleting OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
-          );
-        } else if (error instanceof Prisma.PrismaClientInitializationError) {
-          if (error.message.includes('libssl') || error.message.includes('openssl')) {
-            throw new Error(OPENSSL_ERROR_MESSAGE);
-          }
-          throw new Error(
-            `Database connection failed (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
-          );
-        } else if (error instanceof Prisma.PrismaClientRustPanicError) {
-            throw new Error(
-                `A critical Prisma engine error occurred (Rust Panic) while deleting spec ID ${id}. Please check server logs for details. Details: ${error.message}`
-            );
-        } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-            throw new Error(
-                `An unknown Prisma database error occurred while deleting spec ID ${id}. Please check server logs for details. Details: ${error.message}`
-            );
-        }
-        const errorMessage = error.message || 'An unknown issue occurred.';
-        throw new Error(
-          `An unexpected error occurred while deleting OpenAPI specification (ID: ${id}) from the database. Details: ${errorMessage}. Check server logs for more.`
-        );
+  try {
+    let specs = getSpecsFromLocalStorage();
+    const specToDelete = specs.find((s) => s.id === id);
+    if (!specToDelete) {
+      throw new Error(`OpenAPI specification with ID ${id} not found for deletion.`);
     }
+    specs = specs.filter((s) => s.id !== id);
+    saveSpecsToLocalStorage(specs);
+    return specToDelete;
+  } catch (error: any) {
+    console.error(`Error deleting OpenAPI spec with ID ${id} from localStorage:`, error);
+    throw new Error(`Failed to delete OpenAPI spec: ${error.message}`);
+  }
 }
-

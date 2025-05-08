@@ -24,7 +24,7 @@ import { useOpenApiStore } from "@/stores/openapi-store";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveOpenApiSpec } from "@/actions/openapi-actions";
+import { saveOpenApiSpec } from "@/actions/openapi-actions"; // Still using this action, but it's refactored
 
 const formSchema = z.discriminatedUnion("type", [
   z.object({
@@ -57,6 +57,13 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
     let rawSpecText: string;
     let inputFileName: string;
 
+    if (typeof window === 'undefined') {
+      setError("This operation can only be performed in the browser.");
+      setLoading(false);
+      toast({title: "Error", description: "Cannot process specs on the server for this demo.", variant: "destructive"});
+      return;
+    }
+
     try {
       if (data.type === "url") {
         const response = await fetch('/api/fetch-spec', {
@@ -85,13 +92,12 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           parsedContent = JSON.parse(rawSpecText);
         }
         specObject = (await SwaggerParser.bundle(JSON.parse(JSON.stringify(parsedContent)))) as OpenAPI.Document; 
-        rawSpecText = YAML.dump(specObject); // Ensure rawSpecText matches the bundled spec
+        rawSpecText = YAML.dump(specObject); 
       }
 
-      // Save to database
+      // Save to localStorage via action
       const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
       
-      // Update Zustand store with the saved spec (which now has an ID)
       setSpec({
         specObject,
         rawSpecText,
@@ -101,7 +107,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
 
       toast({
         title: "Success",
-        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved.`,
+        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved to browser storage.`,
         variant: "default",
       });
       
@@ -137,7 +143,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           Import OpenAPI Specification
         </CardTitle>
         <CardDescription>
-          Upload a file or provide a URL. Imported specs will be saved to the database.
+          Upload a file or provide a URL. Imported specs will be saved to your browser's local storage.
           {currentFileName && (
              <span className="block mt-2 text-sm text-muted-foreground">
                 Currently active: <strong className="text-foreground">{currentFileName}</strong> {activeSpecId ? `(ID: ${activeSpecId.substring(0,8)}...)` : ''}

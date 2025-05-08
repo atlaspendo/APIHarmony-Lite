@@ -19,7 +19,7 @@ export async function saveOpenApiSpec(
       },
     });
     return newSpec;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving OpenAPI spec:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2021' || error.code === 'P1003') {
@@ -27,14 +27,25 @@ export async function saveOpenApiSpec(
           'Database or table not found. Please ensure migrations have been run: `npx prisma migrate dev` and the database is accessible.'
         );
       }
-      // For other known Prisma errors
       throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while saving the OpenAPI specification. Please check server logs for more details and ensure your database is correctly configured and accessible.`
+        `A Prisma error occurred (Code: ${error.code}) while saving the OpenAPI specification. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
+    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      throw new Error(
+        `Database connection failed (Prisma Initialization Error: ${error.message}) while saving. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
+      );
+    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+        throw new Error(
+            `A critical Prisma engine error occurred (Rust Panic) while saving. Please check server logs for details. Details: ${error.message}`
+        );
+    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+        throw new Error(
+            `An unknown Prisma database error occurred while saving. Please check server logs for details. Details: ${error.message}`
+        );
     }
-    // For non-Prisma errors or unknown errors
+    const errorMessage = error.message || 'An unknown issue occurred.';
     throw new Error(
-      'An unexpected error occurred while saving the OpenAPI specification to the database. Check server logs for details.'
+      `An unexpected error occurred while saving the OpenAPI specification to the database. Details: ${errorMessage}. Check server logs for more.`
     );
   }
 }
@@ -47,7 +58,7 @@ export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
       },
     });
     return specs;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching OpenAPI specs:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2021' || error.code === 'P1003') {
@@ -55,14 +66,25 @@ export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
           'Database or table not found. Please ensure migrations have been run: `npx prisma migrate dev` and the database is accessible.'
         );
       }
-      // For other known Prisma errors
       throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specifications. Please check server logs for more details and ensure your database is correctly configured and accessible.`
+        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specifications. Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
+    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      throw new Error(
+        `Database connection failed (Prisma Initialization Error: ${error.message}). Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
+      );
+    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+        throw new Error(
+            `A critical Prisma engine error occurred (Rust Panic). Please check server logs for details. Details: ${error.message}`
+        );
+    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+        throw new Error(
+            `An unknown Prisma database error occurred. Please check server logs for details. Details: ${error.message}`
+        );
     }
-    // For non-Prisma errors or unknown errors
+    const errorMessage = error.message || 'An unknown issue occurred.';
     throw new Error(
-      'An unexpected error occurred while fetching OpenAPI specifications from the database. Check server logs for details.'
+      `An unexpected error occurred while fetching OpenAPI specifications from the database. Details: ${errorMessage}. Check server logs for more.`
     );
   }
 }
@@ -73,7 +95,7 @@ export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null
       where: { id },
     });
     return spec;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error fetching OpenAPI spec with ID ${id}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2021' || error.code === 'P1003') {
@@ -81,14 +103,25 @@ export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null
           `Database or table not found when fetching spec ID ${id}. Ensure migrations are run: \`npx prisma migrate dev\` and the database is accessible.`
         );
       }
-      // For other known Prisma errors
       throw new Error(
-        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specification (ID: ${id}). Please check server logs for more details and ensure your database is correctly configured and accessible.`
+        `A Prisma error occurred (Code: ${error.code}) while fetching OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
       );
+    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+      throw new Error(
+        `Database connection failed (Prisma Initialization Error: ${error.message}) while fetching spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
+      );
+    } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+        throw new Error(
+            `A critical Prisma engine error occurred (Rust Panic) while fetching spec ID ${id}. Please check server logs for details. Details: ${error.message}`
+        );
+    } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+        throw new Error(
+            `An unknown Prisma database error occurred while fetching spec ID ${id}. Please check server logs for details. Details: ${error.message}`
+        );
     }
-    // For non-Prisma errors or unknown errors
+    const errorMessage = error.message || 'An unknown issue occurred.';
     throw new Error(
-      `An unexpected error occurred while fetching OpenAPI specification (ID: ${id}) from the database. Check server logs for details.`
+      `An unexpected error occurred while fetching OpenAPI specification (ID: ${id}) from the database. Details: ${errorMessage}. Check server logs for more.`
     );
   }
 }
@@ -99,7 +132,7 @@ export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
             where: { id },
         });
         return deletedSpec;
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error deleting OpenAPI spec with ID ${id}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
           if (error.code === 'P2021' || error.code === 'P1003') {
@@ -109,14 +142,25 @@ export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
           } else if (error.code === 'P2025') { // Record to delete not found
              throw new Error(`OpenAPI specification with ID ${id} not found for deletion.`);
           }
-          // For other known Prisma errors
           throw new Error(
-            `A Prisma error occurred (Code: ${error.code}) while deleting OpenAPI specification (ID: ${id}). Please check server logs for more details and ensure your database is correctly configured and accessible.`
+            `A Prisma error occurred (Code: ${error.code}) while deleting OpenAPI specification (ID: ${id}). Details: ${error.message}. Please check server logs and ensure your database is correctly configured and accessible.`
           );
+        } else if (error instanceof Prisma.PrismaClientInitializationError) {
+          throw new Error(
+            `Database connection failed (Prisma Initialization Error: ${error.message}) while deleting spec ID ${id}. Ensure the database server is running and accessible, and check your DATABASE_URL in .env.`
+          );
+        } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+            throw new Error(
+                `A critical Prisma engine error occurred (Rust Panic) while deleting spec ID ${id}. Please check server logs for details. Details: ${error.message}`
+            );
+        } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+            throw new Error(
+                `An unknown Prisma database error occurred while deleting spec ID ${id}. Please check server logs for details. Details: ${error.message}`
+            );
         }
-        // For non-Prisma errors or unknown errors
+        const errorMessage = error.message || 'An unknown issue occurred.';
         throw new Error(
-          `An unexpected error occurred while deleting OpenAPI specification (ID: ${id}) from the database. Check server logs for details.`
+          `An unexpected error occurred while deleting OpenAPI specification (ID: ${id}) from the database. Details: ${errorMessage}. Check server logs for more.`
         );
     }
 }

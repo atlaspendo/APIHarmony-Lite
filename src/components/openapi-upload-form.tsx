@@ -35,8 +35,6 @@ const formSchema = z.discriminatedUnion("type", [
     file: z.any()
       .refine((value): value is FileList => {
         if (typeof window === 'undefined') {
-          // Always pass server-side validation for this check,
-          // as FileList is a browser-specific API.
           return true;
         }
         return value instanceof FileList;
@@ -47,7 +45,6 @@ const formSchema = z.discriminatedUnion("type", [
         if (typeof window === 'undefined') {
           return true;
         }
-        // This check assumes value is FileList due to previous refinement on client
         return value?.length === 1;
       }, {
         message: "Please upload exactly one file.",
@@ -56,7 +53,6 @@ const formSchema = z.discriminatedUnion("type", [
          if (typeof window === 'undefined') {
           return true;
         }
-        // This check assumes value is FileList and has one item
         return value?.[0] instanceof File;
       }, {
         message: "The uploaded item must be a valid file.",
@@ -84,11 +80,24 @@ export function OpenApiUploadForm() {
 
     try {
       if (data.type === "url") {
-        specObject = (await SwaggerParser.bundle(data.url)) as OpenAPI.Document; // bundle also validates and dereferences
-        rawSpecText = YAML.dump(specObject);
+        // Call the internal API route to fetch the spec
+        const response = await fetch('/api/fetch-spec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: data.url }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to fetch spec from URL: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        specObject = result.specObject as OpenAPI.Document;
+        rawSpecText = result.rawSpecText;
         fileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
       } else {
-        // At this point, client-side Zod validation has ensured data.file is a FileList with one File.
+        // File upload logic
         const file = data.file[0];
         fileName = file.name;
         rawSpecText = await file.text();
@@ -100,9 +109,9 @@ export function OpenApiUploadForm() {
           parsedContent = JSON.parse(rawSpecText);
         }
         // Validate and dereference the parsed content
-        specObject = (await SwaggerParser.validate(JSON.parse(JSON.stringify(parsedContent)))) as OpenAPI.Document; 
-        // SwaggerParser.validate works best with plain JS objects, hence stringify/parse.
-        // To ensure rawSpecText is aligned with what SwaggerParser processed if it modifies it during validation/bundling, re-dump:
+        // Using bundle for files too, to handle potential internal/external refs, similar to URL processing
+        specObject = (await SwaggerParser.bundle(JSON.parse(JSON.stringify(parsedContent)))) as OpenAPI.Document; 
+        // Re-dump to ensure rawSpecText aligns with potentially modified specObject by SwaggerParser
         rawSpecText = YAML.dump(specObject);
       }
 
@@ -113,7 +122,7 @@ export function OpenApiUploadForm() {
         variant: "default",
       });
     } catch (err: any) {
-      console.error("Error parsing OpenAPI spec:", err);
+      console.error("Error processing OpenAPI spec:", err);
       let errorMessage = "Failed to parse or validate OpenAPI specification.";
       if (err.message) {
         errorMessage = err.message;
@@ -177,18 +186,17 @@ export function OpenApiUploadForm() {
                 <FormField
                   control={form.control}
                   name="file"
-                  render={({ field }) => ( // field.onChange will receive FileList from input
+                  render={({ field }) => ( 
                     <FormItem>
                       <FormLabel>Specification File</FormLabel>
                       <FormControl>
                         <Input 
                           type="file" 
                           accept=".json,.yaml,.yml"
-                          // react-hook-form's onChange expects the event or FileList
                           onChange={(e) => field.onChange(e.target.files)}
-                          ref={field.ref} // Ensure ref is passed for RHF to manage the input
-                          name={field.name} // Ensure name is passed
-                          onBlur={field.onBlur} // Ensure onBlur is passed
+                          ref={field.ref} 
+                          name={field.name} 
+                          onBlur={field.onBlur} 
                         />
                       </FormControl>
                       <FormDescription>
@@ -214,4 +222,3 @@ export function OpenApiUploadForm() {
     </Card>
   );
 }
-

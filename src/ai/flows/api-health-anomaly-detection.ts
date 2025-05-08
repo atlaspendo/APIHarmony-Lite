@@ -19,9 +19,10 @@ export const AnalyzeApiHealthInputSchema = z.object({
     .string()
     .optional()
     .describe('JSON string representing timeseries metrics data. For example: [{timestamp: "YYYY-MM-DDTHH:mm:ssZ", latency_ms: 120, error_rate: 0.05, throughput_rpm: 500}, ...]. Ensure at least one of logs or metrics is provided.'),
-}).refine(data => data.apiLogs || data.metricsData, {
-  message: "Either API logs or metrics data must be provided.",
 });
+// .refine(data => data.apiLogs || data.metricsData, { // Removed due to Next.js compiler error
+//   message: "Either API logs or metrics data must be provided.",
+// });
 export type AnalyzeApiHealthInput = z.infer<typeof AnalyzeApiHealthInputSchema>;
 
 export const AnalyzeApiHealthOutputSchema = z.object({
@@ -53,6 +54,9 @@ export const AnalyzeApiHealthOutputSchema = z.object({
 export type AnalyzeApiHealthOutput = z.infer<typeof AnalyzeApiHealthOutputSchema>;
 
 export async function analyzeApiHealth(input: AnalyzeApiHealthInput): Promise<AnalyzeApiHealthOutput> {
+  if (!input.apiLogs && !input.metricsData) {
+    throw new Error("Either API logs or metrics data must be provided.");
+  }
   return analyzeApiHealthFlow(input);
 }
 
@@ -99,3 +103,4 @@ const analyzeApiHealthFlow = ai.defineFlow(
     return output!;
   }
 );
+

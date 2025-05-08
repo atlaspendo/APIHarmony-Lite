@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge"; // Added import for Badge
 
 export function GenerateDocumentationView() {
   const [generationResult, setGenerationResult] = useState<GenerateApiDocumentationOutput | null>(null);
@@ -131,7 +132,7 @@ export function GenerateDocumentationView() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">The AI is working on generating the OpenAPI specification. This may take a few moments.</p>
-            <Progress value={undefined} className="mt-4" />
+            <Progress value={isLoading ? undefined : 100} className="mt-4" />
           </CardContent>
         </Card>
       )}
@@ -160,7 +161,7 @@ export function GenerateDocumentationView() {
             {generationResult.suggestionsForImprovement && generationResult.suggestionsForImprovement.length > 0 && (
               <div>
                 <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
-                  <Icons.Settings className="w-4 h-4 text-blue-500" /> Suggestions for Improvement:
+                  <Icons.Settings className="w-4 h-4 text-accent" /> Suggestions for Improvement:
                 </h3>
                 <ul className="list-disc list-inside pl-4 space-y-1 text-sm text-muted-foreground">
                   {generationResult.suggestionsForImprovement.map((suggestion, index) => (

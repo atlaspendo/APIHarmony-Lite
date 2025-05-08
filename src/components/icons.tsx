@@ -30,12 +30,14 @@ import {
   Edit,
   Home, 
   ListChecks,
-  FilePlus2, // Added for Generate Documentation
-  FileOutput,  // Alternative for Generate Documentation
-  Activity,    // Added for Health Monitoring
-  HeartPulse,  // Alternative for Health Monitoring
-  ShieldCheck, // Added for Compliance Check
-  Gavel,       // Alternative for Compliance Check
+  FilePlus2, 
+  FileOutput,  
+  Activity,    
+  HeartPulse,  
+  ShieldCheck, 
+  Gavel,
+  LogIn, // Added
+  LogOut, // Added
 } from 'lucide-react';
 
 export const Icons = {
@@ -74,6 +76,8 @@ export const Icons = {
   HeartPulse,
   ShieldCheck,
   Gavel,
+  LogIn,
+  LogOut,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

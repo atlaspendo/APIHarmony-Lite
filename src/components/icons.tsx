@@ -51,7 +51,14 @@ import {
   RefreshCw,
   Maximize,
   Palette, // For Pattern Intelligence or general design
-  Search, 
+  Search,
+  Radar, // For Live API Discovery
+  TrendingUp, // For Predictive Monitoring
+  Webhook, // Alternative for discovery or events
+  LocateFixed, // Alternative for discovery
+  ServerSearch, // Alternative for discovery
+  BrainCircuit, // Alternative for predictive/AI
+  Gauge, // Alternative for monitoring/predictive
 } from 'lucide-react';
 
 export const Icons = {
@@ -106,6 +113,13 @@ export const Icons = {
   Maximize,
   Palette,
   Search,
+  Radar,
+  TrendingUp,
+  Webhook,
+  LocateFixed,
+  ServerSearch,
+  BrainCircuit,
+  Gauge,
 };
 
 export const ApiMethodIcons: Record<string, React.ElementType> = {

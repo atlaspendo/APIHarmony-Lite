@@ -7,3 +7,4 @@ import '@/ai/flows/integration-pattern-analysis.ts'; // Renamed from api-pattern
 import '@/ai/flows/api-documentation-generation.ts';
 import '@/ai/flows/api-health-anomaly-detection.ts';
 import '@/ai/flows/api-compliance-check.ts';
+import '@/ai/flows/api-predictive-monitoring.ts';

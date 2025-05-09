@@ -55,7 +55,10 @@ export function PredictionCard({ prediction }: PredictionCardProps) {
         </div>
         <div className="mt-auto">
             <div className="text-xs text-muted-foreground mb-1">Confidence: {confidencePercent.toFixed(0)}%</div>
-            <Progress value={confidencePercent} className="h-2" 
+            <Progress 
+                value={confidencePercent} 
+                className="h-2"
+                // Apply the indicator color class via the dedicated prop
                 indicatorClassName={
                     confidencePercent < 50 ? "bg-red-500" :
                     confidencePercent < 75 ? "bg-orange-500" :
@@ -68,9 +71,10 @@ export function PredictionCard({ prediction }: PredictionCardProps) {
   );
 }
 
-// Small helper for Progress indicator color until ShadCN supports it better
-declare module "react" {
-    interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
-      indicatorClassName?: string;
-    }
-}
+// Remove helper declaration for Progress indicator color
+// It's no longer needed as the prop is handled correctly now
+// declare module "react" {
+//     interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
+//       indicatorClassName?: string;
+//     }
+// }

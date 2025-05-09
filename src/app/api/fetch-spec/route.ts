@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import SwaggerParser from "@apidevtools/swagger-parser";
 import YAML from 'js-yaml';
@@ -18,41 +17,36 @@ export async function POST(request: NextRequest) {
 
     // Try fetching and parsing
     const response = await fetch(specUrl);
+    let responseBodyText: string; // Declare here to be accessible after the if block
+
     if (!response.ok) {
-      // Attempt to read response body for more detailed error, even if not JSON
-      const responseBodyText = await response.text();
+      responseBodyText = await response.text(); // Read the body for error details
       let errorMsgFromServer = `Failed to fetch spec from URL: ${response.status} ${response.statusText}`;
       
       try {
-        // Try parsing as JSON if possible, to extract a more specific error message
         const errorJson = JSON.parse(responseBodyText);
         if (errorJson && errorJson.error) {
           errorMsgFromServer = errorJson.error;
-        } else if (responseBodyText.length > 0 && responseBodyText.length < 200) { // If it's short, it might be a plain text error
+        } else if (responseBodyText.length > 0 && responseBodyText.length < 200) {
             errorMsgFromServer = responseBodyText;
         }
       } catch (jsonParseError) {
-        // If JSON parsing fails, it's likely not a JSON error response.
-        // Use the text content if it's not too long (e.g. not an HTML page)
         if (responseBodyText && responseBodyText.length > 0 && !responseBodyText.toLowerCase().includes("<!doctype html>")) {
             errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 200)}`;
         } else if (responseBodyText.toLowerCase().includes("<!doctype html>")) {
             errorMsgFromServer = `Failed to fetch. Server returned an HTML page instead of a spec (Status: ${response.status})`;
         }
       }
-      // If responseBodyText is empty and statusText is not useful, the initial default message is used.
-      
-      throw new Error(errorMsgFromServer); // This was line 89
+      throw new Error(errorMsgFromServer);
     }
+    
     // If response.ok is true
-    const responseBodyText = await response.text(); // This is fine, first read for success path
+    responseBodyText = await response.text(); // Read the body for successful parsing
 
     try {
       // Try parsing as YAML first
       parsedSpec = YAML.load(responseBodyText) as OpenAPI.Document;
       // Validate and bundle (which also converts to a standard JS object structure)
-      // SwaggerParser.bundle expects a path or a JS object, not raw YAML text directly for its main argument.
-      // So we give it the parsed YAML object.
       parsedSpec = await SwaggerParser.bundle(JSON.parse(JSON.stringify(parsedSpec))) as OpenAPI.Document;
       rawSpecText = YAML.dump(parsedSpec); // Convert the bundled spec back to YAML for rawSpecText
     } catch (yamlError) {
@@ -77,7 +71,7 @@ export async function POST(request: NextRequest) {
     
     if (error && error.message) {
         if (error.message.includes('Failed to fetch') || error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED') || error.message.includes('EAI_AGAIN')) {
-            errorMessage = `Could not connect to or retrieve the specification from the URL: ${error.message}`;
+            errorMessage = `Could not connect to or retrieve the specification from the URL. Please check the URL and network connectivity. Details: ${error.message}`;
         } else {
             errorMessage = error.message; 
         }

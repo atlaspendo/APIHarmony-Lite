@@ -157,19 +157,10 @@ export function IntegrationAnalysisView() {
 
       {analysisResults && !isLoading && !analysisError && (
         <Tabs defaultValue="pattern-intelligence" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="api-discovery"><Icons.Search className="w-4 h-4 mr-2"/>Live API Discovery</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-1"> {/* Changed grid-cols-3 to grid-cols-1 */}
             <TabsTrigger value="pattern-intelligence"><Icons.Lightbulb className="w-4 h-4 mr-2"/>Pattern Intelligence</TabsTrigger>
-            <TabsTrigger value="predictive-monitoring"><Icons.LineChart className="w-4 h-4 mr-2"/>Predictive Monitoring</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="api-discovery" className="mt-4">
-            <Card>
-              <CardHeader><CardTitle>Live API Discovery</CardTitle><CardDescription>This feature is under development. Discover APIs in real-time across your enterprise systems.</CardDescription></CardHeader>
-              <CardContent><p className="text-muted-foreground">Coming soon: Real-time scanning and fingerprinting of APIs.</p></CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="pattern-intelligence" className="mt-4">
             <Card>
               <CardHeader>
@@ -243,15 +234,9 @@ export function IntegrationAnalysisView() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="predictive-monitoring" className="mt-4">
-            <Card>
-               <CardHeader><CardTitle>Predictive Monitoring</CardTitle><CardDescription>This feature is under development. Anticipate integration issues before they impact services.</CardDescription></CardHeader>
-              <CardContent><p className="text-muted-foreground">Coming soon: ML-based failure prediction and proactive alerts.</p></CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       )}
     </div>
   );
 }
+

@@ -25,21 +25,26 @@ interface SelectedPattern {
   type: 'pattern' | 'anti-pattern' | 'recommendation';
 }
 
-const FeatureCard = ({ title, description, icon, link, linkText, action }: { title: string, description: string, icon: React.ReactNode, link?: string, linkText?: string, action?: React.ReactNode }) => (
-  <Card className="flex flex-col shadow-sm hover:shadow-lg transition-shadow bg-card">
+const FeatureCard = ({ title, description, icon, link, linkText, action, features }: { title: string, description: string, icon: React.ReactNode, link?: string, linkText?: string, action?: React.ReactNode, features?: string[] }) => (
+  <Card className="flex flex-col shadow-sm hover:shadow-lg transition-shadow bg-card h-full">
     <CardHeader className="flex-row items-start gap-4 space-y-0 pb-3">
-      <div className="p-2 bg-primary/10 rounded-lg"> {/* Enhanced icon background */}
+      <div className="p-2 bg-primary/10 rounded-lg text-primary">
         {icon}
       </div>
       <div>
         <CardTitle className="text-lg font-semibold">{title}</CardTitle>
       </div>
     </CardHeader>
-    <CardContent className="flex-grow">
+    <CardContent className="flex-grow space-y-2">
       <p className="text-sm text-muted-foreground">{description}</p>
+      {features && features.length > 0 && (
+        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 pl-2">
+          {features.map((feature, index) => <li key={index}>{feature}</li>)}
+        </ul>
+      )}
     </CardContent>
     {(link && linkText || action) && (
-      <CardFooter>
+      <CardFooter className="mt-auto">
         {action}
         {link && linkText && (
           <Button asChild className="w-full" variant="outline">
@@ -59,7 +64,7 @@ export function IntegrationAnalysisView() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedPattern, setSelectedPattern] = useState<SelectedPattern | null>(null);
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("pattern-intelligence");
+  const [activeTab, setActiveTab] = useState("ai-feature-suite"); // Default to AI Feature Suite
 
 
   const handleAnalysis = async () => {
@@ -74,7 +79,7 @@ export function IntegrationAnalysisView() {
 
     setIsLoading(true);
     setAnalysisError(null);
-    setAnalysisResults(null);
+    // setAnalysisResults(null); // Keep previous results while loading new ones for Pattern tab
     setSelectedPattern(null);
 
     try {
@@ -154,10 +159,10 @@ export function IntegrationAnalysisView() {
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2">
-            <Icons.Palette className="w-6 h-6 text-primary" /> API Integration Intelligence Hub
+            <Icons.BrainCircuit className="w-6 h-6 text-primary" /> API Integration Intelligence Hub
           </CardTitle>
           <CardDescription>
-            Leverage AI to analyze patterns, discover APIs, monitor health, and ensure compliance.
+            Leverage AI to analyze patterns, discover APIs, monitor health, ensure compliance, and more.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -174,7 +179,7 @@ export function IntegrationAnalysisView() {
                 setAnalysisResults(null);
                 setSelectedPattern(null);
                 setAnalysisError(null);
-                setActiveTab("pattern-intelligence"); // Reset to pattern intelligence on new spec
+                setActiveTab("ai-feature-suite");
               }} />
             </>
           )}
@@ -191,16 +196,192 @@ export function IntegrationAnalysisView() {
           {spec && !specError && (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="pattern-intelligence">
-                  <Icons.Palette className="w-4 h-4 mr-2"/>Pattern Intelligence
-                </TabsTrigger>
                 <TabsTrigger value="ai-feature-suite">
                   <Icons.BrainCircuit className="w-4 h-4 mr-2"/>AI Feature Suite
                 </TabsTrigger>
+                <TabsTrigger value="pattern-intelligence">
+                  <Icons.Palette className="w-4 h-4 mr-2"/>Pattern Intelligence
+                </TabsTrigger>
               </TabsList>
 
+              <TabsContent value="ai-feature-suite">
+                <div className="space-y-6">
+                  <Card className="bg-card border-primary/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3 text-xl"><Icons.Search className="w-6 h-6 text-primary"/>Automated API Discovery & Documentation</CardTitle>
+                      <CardDescription>Discover, document, and visualize your API landscape.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <FeatureCard
+                        title="Live API Discovery"
+                        description="Simulated multi-method scanning to identify API endpoints across systems."
+                        icon={<Icons.Radar className="w-8 h-8"/>}
+                        features={[
+                          "Common path scanning",
+                          "Response analysis hints",
+                          "Confidence scoring (simulated)"
+                        ]}
+                        link="/live-api-discovery"
+                        linkText="Explore Discovery"
+                      />
+                      <FeatureCard
+                        title="AI Document Generation"
+                        description="Automatically generate OpenAPI specifications from descriptions or partial specs."
+                        icon={<Icons.FilePlus2 className="w-8 h-8"/>}
+                        features={[
+                          "Natural language to OpenAPI",
+                          "Partial spec enhancement",
+                          "YAML output with confidence"
+                        ]}
+                        link="/generate-documentation"
+                        linkText="Generate Docs"
+                      />
+                      <FeatureCard
+                        title="Dependency Graph"
+                        description="Interactive visual relationship mapping for your API schemas and operations."
+                        icon={<Icons.GitFork className="w-8 h-8"/>}
+                        features={[
+                          "Schema usage by operations",
+                          "Inter-schema references",
+                          "Supports OpenAPI v2 & v3"
+                        ]}
+                        link="/dependency-graph"
+                        linkText="View Dependencies"
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-primary/30">
+                     <CardHeader>
+                      <CardTitle className="flex items-center gap-3 text-xl"><Icons.Palette className="w-6 h-6 text-primary"/>Integration Pattern Analysis & Recommendation</CardTitle>
+                      <CardDescription>Deep learning-based pattern recognition and best practice recommendations.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 gap-4">
+                       <FeatureCard
+                        title="AI Pattern Analysis"
+                        description="Analyze your OpenAPI spec for integration patterns, anti-patterns, and get improvement suggestions."
+                        icon={<Icons.Lightbulb className="w-8 h-8"/>}
+                        features={[
+                            "Identifies common patterns (e.g., API Gateway, CQRS hints)",
+                            "Detects anti-patterns (e.g., chatty APIs)",
+                            "Provides actionable recommendations"
+                        ]}
+                        action={<Button variant="outline" onClick={() => { setActiveTab('pattern-intelligence'); if (!analysisResults && rawSpec) handleAnalysis(); }}>Analyze Current Spec</Button>}
+                      />
+                       <FeatureCard
+                        title="Conceptual Advanced Features"
+                        description="Future capabilities for deeper integration insights."
+                        icon={<Icons.Zap className="w-8 h-8"/>}
+                        features={[
+                            "Implementation code generation for patterns (Conceptual)",
+                            "ROI analysis of optimizations (Conceptual)",
+                            "Automatic A/B testing of approaches (Conceptual)"
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-primary/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3 text-xl"><Icons.HeartPulse className="w-6 h-6 text-primary"/>Comprehensive API Health Monitoring</CardTitle>
+                      <CardDescription>Real-time metrics, anomaly detection, and root cause analysis.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <FeatureCard
+                        title="Health & Anomaly Detection"
+                        description="Analyze API logs/metrics for performance issues and anomalies."
+                        icon={<Icons.Activity className="w-8 h-8"/>}
+                        features={[
+                            "Log & metrics data input",
+                            "ML-powered anomaly detection",
+                            "Root cause suggestions"
+                        ]}
+                        link="/health-monitoring"
+                        linkText="Monitor Health"
+                      />
+                      <FeatureCard
+                        title="Predictive Monitoring"
+                        description="Forecast future API behavior and potential failures based on historical trends."
+                        icon={<Icons.TrendingUp className="w-8 h-8"/>}
+                        features={[
+                            "Time-series data analysis",
+                            "Future state predictions (latency, errors etc.)",
+                            "Preventive recommendations"
+                        ]}
+                        link="/predictive-monitoring"
+                        linkText="Predict Trends"
+                      />
+                       <FeatureCard
+                        title="Conceptual Advanced Monitoring"
+                        description="Future enhancements for proactive API management."
+                        icon={<Icons.Gauge className="w-8 h-8"/>}
+                        features={[
+                            "Automated remediation for common failures (Conceptual)",
+                            "Business impact assessment of issues (Conceptual)"
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-primary/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3 text-xl"><Icons.Gavel className="w-6 h-6 text-primary"/>Governance & Compliance Management</CardTitle>
+                      <CardDescription>Ensure security, compliance, and manage the API lifecycle.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <FeatureCard
+                        title="Vulnerability Scanning"
+                        description="AI-driven security vulnerability scanning for APIs based on OpenAPI specs."
+                        icon={<Icons.ShieldAlert className="w-8 h-8"/>}
+                        features={[
+                            "Identifies common security issues",
+                            "Provides actionable recommendations"
+                        ]}
+                        link="/vulnerability-scan"
+                        linkText="Scan for Vulnerabilities"
+                      />
+                      <FeatureCard
+                        title="Compliance Checks"
+                        description="Audit your APIs against predefined compliance profiles (e.g., PII, Financial)."
+                        icon={<Icons.ShieldCheck className="w-8 h-8"/>}
+                        features={[
+                            "Checks against GENERAL, PII, FINANCIAL profiles",
+                            "Detailed rule-based analysis"
+                        ]}
+                        link="/compliance-check"
+                        linkText="Check Compliance"
+                      />
+                      <FeatureCard
+                        title="Conceptual Governance Features"
+                        description="Future capabilities for comprehensive API governance."
+                        icon={<Icons.ClipboardList className="w-8 h-8"/>}
+                        features={[
+                            "Data flow tracking & visualization (Conceptual)",
+                            "API lifecycle management (Conceptual)",
+                            "Usage analytics & dependency mapping (Conceptual)"
+                        ]}
+                      />
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-card border-primary/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3 text-xl"><Icons.Settings className="w-6 h-6 text-primary"/>Self-Optimizing Integration Framework (Conceptual)</CardTitle>
+                      <CardDescription>Future capabilities for continuous performance optimization and intelligent operations. These features are not yet implemented.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm text-muted-foreground space-y-3 p-6 grid md:grid-cols-2 gap-x-6 gap-y-3">
+                        <p className="flex items-start"><Icons.RefreshCw className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/>Continuous performance optimization using reinforcement learning.</p>
+                        <p className="flex items-start"><Icons.Maximize className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/>Automatic scaling recommendations based on usage patterns.</p>
+                        <p className="flex items-start"><Icons.Share2 className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/>Intelligent request routing for optimal performance.</p>
+                        <p className="flex items-start"><Icons.Zap className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/>Background synchronization optimization for data consistency.</p>
+                        <p className="flex items-start"><Icons.Lightbulb className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/>Caching strategy recommendations and implementations.</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+              
               <TabsContent value="pattern-intelligence">
-                {isLoading && (
+                {isLoading && !analysisResults && ( // Show loading only if no previous results exist
                   <Card className="mt-6 shadow-lg">
                     <CardHeader><CardTitle className="text-xl flex items-center gap-2"><Icons.Loader className="w-5 h-5 animate-spin text-primary" /> Analyzing Integration Patterns...</CardTitle></CardHeader>
                     <CardContent><p className="text-muted-foreground">AI is evaluating the design of the OpenAPI specification. This may take a moment.</p></CardContent>
@@ -226,10 +407,10 @@ export function IntegrationAnalysisView() {
                   </div>
                 )}
 
-                {analysisResults && !isLoading && !analysisError && (
+                {analysisResults && ( // Always show results section if available, even if loading new ones
                   <Card className="mt-4 border-0 shadow-none">
                     <CardHeader>
-                        <CardTitle>Pattern Intelligence Report</CardTitle>
+                        <CardTitle>Pattern Intelligence Report {isLoading && <Icons.Loader className="w-5 h-5 animate-spin text-primary inline-block ml-2"/>}</CardTitle>
                         <CardDescription>{analysisResults.summary || "AI-powered insights into API integration design."}</CardDescription>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
@@ -277,7 +458,7 @@ export function IntegrationAnalysisView() {
                               </CardTitle>
                               <CardDescription className="capitalize text-xs">{selectedPattern.type}</CardDescription>
                             </CardHeader>
-                            <ScrollArea className="h-[calc(100%-4rem-1.5rem)]">
+                            <ScrollArea className="h-[calc(100%-4rem-1.5rem)]"> {/* Adjust height based on CardHeader */}
                               <CardContent>
                                 <p className="text-sm mb-3">{selectedPattern.description}</p>
                                 {selectedPattern.examples && selectedPattern.examples.length > 0 && (
@@ -300,127 +481,18 @@ export function IntegrationAnalysisView() {
                           </Card>
                         ) : (
                           <div className="flex items-center justify-center h-full text-muted-foreground p-8 border rounded-md bg-muted/30">
-                            <p>Select an item from the left to view details.</p>
+                            <p>Select an item from the left to view details, or run analysis if no results are shown.</p>
                           </div>
                         )}
                       </div>
                     </CardContent>
                      <CardFooter>
-                       <Button onClick={handleAnalysis} variant="outline" className="w-full">
+                       <Button onClick={handleAnalysis} variant="outline" className="w-full" disabled={isLoading}>
                           <Icons.RefreshCw className="mr-2 h-4 w-4" /> Re-analyze Current Specification
                       </Button>
                     </CardFooter>
                   </Card>
                 )}
-              </TabsContent>
-
-              <TabsContent value="ai-feature-suite">
-                <div className="space-y-6">
-                  <Card className="bg-primary/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><Icons.Search className="w-5 h-5 text-primary"/>Automated API Discovery & Documentation</CardTitle>
-                      <CardDescription>Discover, document, and visualize your API landscape.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <FeatureCard
-                        title="Live API Discovery"
-                        description="Multi-method scanning to identify API endpoints across systems (Simulated)."
-                        icon={<Icons.Radar className="w-8 h-8 text-accent"/>}
-                        link="/live-api-discovery"
-                        linkText="Explore Discovery"
-                      />
-                      <FeatureCard
-                        title="AI Document Generation"
-                        description="Automatically generate OpenAPI/Swagger specifications from descriptions or partial specs."
-                        icon={<Icons.FilePlus2 className="w-8 h-8 text-accent"/>}
-                        link="/generate-documentation"
-                        linkText="Generate Docs"
-                      />
-                      <FeatureCard
-                        title="Dependency Graph"
-                        description="Interactive visual relationship mapping with dependency tracking for your schemas."
-                        icon={<Icons.GitFork className="w-8 h-8 text-accent"/>}
-                        link="/dependency-graph"
-                        linkText="View Dependencies"
-                      />
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-primary/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><Icons.Palette className="w-5 h-5 text-primary"/>Integration Pattern Analysis</CardTitle>
-                      <CardDescription>Deep learning-based pattern recognition and best practice recommendations.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <FeatureCard
-                        title="Pattern Intelligence"
-                        description="Analyze your OpenAPI spec for integration patterns, anti-patterns, and get improvement suggestions. Access this feature in the 'Pattern Intelligence' tab."
-                        icon={<Icons.Palette className="w-8 h-8 text-accent"/>}
-                        action={<Button variant="outline" onClick={() => setActiveTab('pattern-intelligence')}>Go to Pattern Analysis</Button>}
-                      />
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-primary/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><Icons.HeartPulse className="w-5 h-5 text-primary"/>Comprehensive API Health Monitoring</CardTitle>
-                      <CardDescription>Real-time metrics, anomaly detection, and root cause analysis.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid md:grid-cols-2 gap-4">
-                      <FeatureCard
-                        title="Health & Anomaly Detection"
-                        description="Analyze API logs/metrics for performance issues, ML-powered anomaly detection, and root cause suggestions."
-                        icon={<Icons.Activity className="w-8 h-8 text-accent"/>}
-                        link="/health-monitoring"
-                        linkText="Monitor Health"
-                      />
-                      <FeatureCard
-                        title="Predictive Monitoring"
-                        description="Forecast future API behavior and potential failures based on historical trends."
-                        icon={<Icons.TrendingUp className="w-8 h-8 text-accent"/>}
-                        link="/predictive-monitoring"
-                        linkText="Predict Trends"
-                      />
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-primary/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><Icons.Gavel className="w-5 h-5 text-primary"/>Governance & Compliance</CardTitle>
-                      <CardDescription>Ensure security, compliance, and manage the API lifecycle.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid md:grid-cols-2 gap-4">
-                      <FeatureCard
-                        title="Vulnerability Scanning"
-                        description="AI-driven security vulnerability scanning for your API implementations based on OpenAPI specs."
-                        icon={<Icons.ShieldAlert className="w-8 h-8 text-accent"/>}
-                        link="/vulnerability-scan"
-                        linkText="Scan for Vulnerabilities"
-                      />
-                      <FeatureCard
-                        title="Compliance Checks"
-                        description="Audit your APIs against predefined compliance profiles (e.g., PII, Financial)."
-                        icon={<Icons.ShieldCheck className="w-8 h-8 text-accent"/>}
-                        link="/compliance-check"
-                        linkText="Check Compliance"
-                      />
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-primary/5">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><Icons.BrainCircuit className="w-5 h-5 text-primary"/>Self-Optimizing Framework</CardTitle>
-                      <CardDescription>Future capabilities for continuous performance optimization and intelligent operations.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground space-y-3 p-6">
-                        <p className="flex items-start"><Icons.RefreshCw className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/> Continuous performance optimization using reinforcement learning (Conceptual).</p>
-                        <p className="flex items-start"><Icons.Maximize className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/> Automatic scaling recommendations based on usage patterns (Conceptual).</p>
-                        <p className="flex items-start"><Icons.Share2 className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/> Intelligent request routing for optimal performance (Conceptual).</p>
-                        <p className="flex items-start"><Icons.Zap className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/> Background synchronization optimization for data consistency (Conceptual).</p>
-                        <p className="flex items-start"><Icons.Lightbulb className="inline w-4 h-4 mr-2 mt-1 text-primary/80 shrink-0"/> Caching strategy recommendations and implementations (Conceptual).</p>
-                    </CardContent>
-                  </Card>
-                </div>
               </TabsContent>
             </Tabs>
           )}

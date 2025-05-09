@@ -25,7 +25,7 @@ import {
   PlusCircle,
   Trash2,
   Network,
-  ArrowRightCircle,
+  ArrowRightCircle, // Ensure ArrowRightCircle is imported
   Edit3,
   Edit,
   Home, 
@@ -87,6 +87,7 @@ export const Icons = {
   HttpDelete: Trash2,
   HttpPatch: Edit,
   HttpGet: ArrowRightCircle, 
+  ArrowRightCircle, // Add ArrowRightCircle here
   Network,
   Home,
   ListChecks,

@@ -50,14 +50,14 @@ import {
   PlayCircle,
   RefreshCw,
   Maximize,
-  Palette, // For Pattern Intelligence or general design
+  Palette, 
   Search,
-  Radar, // For Live API Discovery
-  TrendingUp, // For Predictive Monitoring
-  Webhook, // Alternative for discovery or events
-  LocateFixed, // Alternative for discovery
-  BrainCircuit, // Alternative for predictive/AI
-  Gauge, // Alternative for monitoring/predictive
+  Radar, 
+  TrendingUp, 
+  Webhook, 
+  LocateFixed, 
+  BrainCircuit, 
+  Gauge, 
 } from 'lucide-react';
 
 export const Icons = {
@@ -116,7 +116,6 @@ export const Icons = {
   TrendingUp,
   Webhook,
   LocateFixed,
-  // ServerSearch, // Removed as it doesn't exist
   BrainCircuit,
   Gauge,
 };

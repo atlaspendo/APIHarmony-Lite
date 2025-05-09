@@ -56,7 +56,6 @@ import {
   TrendingUp, // For Predictive Monitoring
   Webhook, // Alternative for discovery or events
   LocateFixed, // Alternative for discovery
-  ServerSearch, // Alternative for discovery
   BrainCircuit, // Alternative for predictive/AI
   Gauge, // Alternative for monitoring/predictive
 } from 'lucide-react';
@@ -117,7 +116,7 @@ export const Icons = {
   TrendingUp,
   Webhook,
   LocateFixed,
-  ServerSearch,
+  // ServerSearch, // Removed as it doesn't exist
   BrainCircuit,
   Gauge,
 };
@@ -132,3 +131,4 @@ export const ApiMethodIcons: Record<string, React.ElementType> = {
   head: Icons.Eye,
   trace: Icons.GitFork,
 };
+

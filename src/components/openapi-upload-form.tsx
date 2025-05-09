@@ -43,7 +43,8 @@ const formSchema = z.discriminatedUnion("type", [
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: string) => void }) {
+// Removed onSpecLoaded from props as it's no longer used.
+export function OpenApiUploadForm({}: { onSpecLoaded?: (specId: string) => void }) {
   const { setSpec, setError, setLoading, isLoading, fileName: currentFileName, activeSpecId } = useOpenApiStore();
   const { toast } = useToast();
 
@@ -58,6 +59,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
     let specObject: OpenAPI.Document;
     let rawSpecText: string;
     let inputFileName: string;
+    let responseBodyText: string | undefined;
 
     if (typeof window === 'undefined' && data.type === 'file') {
       setError("File upload can only be performed in the browser.");
@@ -73,33 +75,28 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: data.url }),
         });
+        
+        responseBodyText = await response.text(); // Read body ONCE as text
 
-        if (!response.ok) { // The /api/fetch-spec call itself failed or indicated an error
-          const responseBodyAsText = await response.text(); // Read body ONCE as text
-          let errorMessage = `Error fetching spec via proxy: ${response.status} ${response.statusText}`; // Default
+        if (!response.ok) { 
+          let errorMsgFromServer = `Error fetching spec via proxy: ${response.status} ${response.statusText}`; 
           try {
-            // Try to parse the text as JSON to get a structured error from /api/fetch-spec
-            const errorJson = JSON.parse(responseBodyAsText);
+            const errorJson = JSON.parse(responseBodyText);
             if (errorJson && errorJson.error) {
-              errorMessage = errorJson.error; // Use the specific error message from /api/fetch-spec
+              errorMsgFromServer = errorJson.error;
             } else {
-              // It was JSON, but not the expected { error: "..." } format
-              errorMessage = `Proxy error (${response.status}): ${responseBodyAsText.substring(0, 200)}...`;
+              errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 200)}...`;
             }
           } catch (e) {
-            // Parsing as JSON failed, means the error response from /api/fetch-spec was likely HTML or plain text
-            errorMessage = `Proxy error (${response.status}): ${responseBodyAsText.substring(0, 200)}...`;
+             errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 200)}...`;
           }
-          throw new Error(errorMessage);
+          throw new Error(errorMsgFromServer);
         }
         
-        // If response.ok, /api/fetch-spec call was successful (HTTP 2xx)
-        // The body should contain { specObject, rawSpecText } or { error } if target fetch failed but proxy is ok
-        const result = await response.json(); 
+        // If response.ok, parse the already read responseBodyText
+        const result = JSON.parse(responseBodyText); 
         
         if (result.error) { 
-            // This means /api/fetch-spec successfully processed the request to the proxy
-            // but the operation within /api/fetch-spec (e.g., fetching from target URL, parsing spec) encountered an error.
             throw new Error(result.error);
         }
         
@@ -123,7 +120,8 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
         specObject = (await SwaggerParser.bundle(specToBundle)) as OpenAPI.Document; 
         rawSpecText = YAML.dump(specObject);
       }
-
+      
+      // Still save the spec to localStorage
       const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
       
       setSpec({
@@ -135,19 +133,20 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
 
       toast({
         title: "Success",
-        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved.`,
+        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved to local storage.`,
         variant: "default",
       });
       
-      if (onSpecLoaded) {
-        onSpecLoaded(savedSpec.id);
-      }
+      // onSpecLoaded callback is removed as per change in parent page
+      // if (onSpecLoaded) {
+      //   onSpecLoaded(savedSpec.id);
+      // }
       form.reset({type: data.type, url: data.type === 'url' ? "" : undefined, file: undefined});
 
     } catch (err: any) {
       console.error("Error processing OpenAPI spec:", err);
       const errorMessage = err.message || "Failed to parse, validate, or save OpenAPI specification.";
-      setError(errorMessage); // Update store error
+      setError(errorMessage); 
       toast({
         title: "Error Processing Specification",
         description: errorMessage,
@@ -179,10 +178,10 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           form.setValue("type", value as "url" | "file");
           if (value === 'url') {
             form.setValue('file', undefined as any); 
-            form.resetField('file'); // Reset file input validation state
+            form.resetField('file'); 
           } else {
             form.setValue('url', '');
-             form.resetField('url'); // Reset URL input validation state
+             form.resetField('url'); 
           }
           form.clearErrors(); 
         }}>
@@ -250,3 +249,4 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
     </Card>
   );
 }
+

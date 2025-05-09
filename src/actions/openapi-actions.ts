@@ -1,8 +1,10 @@
-'use server';
+
+// Removed 'use server' as localStorage operations are client-side.
+// Client components will call these functions directly.
 
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 
-// Define a local OpenApiSpec type as Prisma is removed
+// Define a local OpenApiSpec type
 export interface OpenApiSpec {
   id: string;
   name: string;
@@ -17,7 +19,9 @@ const LOCAL_STORAGE_KEY = 'apiHarmonyLiteSpecs';
 // Helper function to get specs from localStorage
 const getSpecsFromLocalStorage = (): OpenApiSpec[] => {
   if (typeof window === 'undefined' || !window.localStorage) {
-    return []; // localStorage not available (e.g., during SSR for actions)
+    // This case should ideally not be hit if called from client components correctly.
+    // console.warn('localStorage is not available. Returning empty array for specs.');
+    return []; 
   }
   const specsJson = window.localStorage.getItem(LOCAL_STORAGE_KEY);
   return specsJson ? JSON.parse(specsJson) : [];
@@ -26,6 +30,7 @@ const getSpecsFromLocalStorage = (): OpenApiSpec[] => {
 // Helper function to save specs to localStorage
 const saveSpecsToLocalStorage = (specs: OpenApiSpec[]): void => {
   if (typeof window === 'undefined' || !window.localStorage) {
+    // console.warn('localStorage is not available. Specs will not be saved.');
     return;
   }
   window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(specs));
@@ -36,6 +41,11 @@ export async function saveOpenApiSpec(
   content: string, // This should be the parsed/validated spec, perhaps as a JSON string
   rawContent: string // The original YAML or JSON string
 ): Promise<OpenApiSpec> {
+  // This function should only be called on the client-side.
+  if (typeof window === 'undefined') {
+    console.error("saveOpenApiSpec was called in an environment without window/localStorage. This indicates an issue.");
+    throw new Error("LocalStorage is not available in this environment.");
+  }
   try {
     const specs = getSpecsFromLocalStorage();
     const now = new Date().toISOString();
@@ -57,6 +67,11 @@ export async function saveOpenApiSpec(
 }
 
 export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
+  // This function should only be called on the client-side.
+  if (typeof window === 'undefined') {
+    console.error("getOpenApiSpecs was called in an environment without window/localStorage.");
+    return []; // Return empty or throw, depending on desired strictness for demo.
+  }
   try {
     const specs = getSpecsFromLocalStorage();
     // Sort by updatedAt descending
@@ -68,6 +83,11 @@ export async function getOpenApiSpecs(): Promise<OpenApiSpec[]> {
 }
 
 export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null> {
+  // This function should only be called on the client-side.
+   if (typeof window === 'undefined') {
+    console.error("getOpenApiSpecById was called in an environment without window/localStorage.");
+    return null;
+  }
   try {
     const specs = getSpecsFromLocalStorage();
     const spec = specs.find((s) => s.id === id) || null;
@@ -79,6 +99,11 @@ export async function getOpenApiSpecById(id: string): Promise<OpenApiSpec | null
 }
 
 export async function deleteOpenApiSpec(id: string): Promise<OpenApiSpec> {
+  // This function should only be called on the client-side.
+  if (typeof window === 'undefined') {
+    console.error("deleteOpenApiSpec was called in an environment without window/localStorage.");
+    throw new Error("LocalStorage is not available in this environment.");
+  }
   try {
     let specs = getSpecsFromLocalStorage();
     const specToDelete = specs.find((s) => s.id === id);

@@ -24,8 +24,8 @@ import { useOpenApiStore } from "@/stores/openapi-store";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveOpenApiSpec, getOpenApiSpecs, deleteOpenApiSpec as deleteSpecAction } from "@/actions/openapi-actions";
-import type { OpenApiSpec as LocalOpenApiSpec } from "@/actions/openapi-actions";
+import { saveOpenApiSpec, type OpenApiSpec as LocalOpenApiSpec } from '@/actions/openapi-actions';
+
 
 const formSchema = z.discriminatedUnion("type", [
   z.object({
@@ -74,10 +74,33 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           body: JSON.stringify({ url: data.url }),
         });
 
-        const result = await response.json(); // Always try to parse response from /api/fetch-spec
-
-        if (!response.ok || result.error) { // Check response.ok AND if result object has an error property
-          throw new Error(result.error || `Failed to fetch spec from URL: ${response.statusText}`);
+        if (!response.ok) { // The /api/fetch-spec call itself failed or indicated an error
+          const responseBodyAsText = await response.text(); // Read body ONCE as text
+          let errorMessage = `Error fetching spec via proxy: ${response.status} ${response.statusText}`; // Default
+          try {
+            // Try to parse the text as JSON to get a structured error from /api/fetch-spec
+            const errorJson = JSON.parse(responseBodyAsText);
+            if (errorJson && errorJson.error) {
+              errorMessage = errorJson.error; // Use the specific error message from /api/fetch-spec
+            } else {
+              // It was JSON, but not the expected { error: "..." } format
+              errorMessage = `Proxy error (${response.status}): ${responseBodyAsText.substring(0, 200)}...`;
+            }
+          } catch (e) {
+            // Parsing as JSON failed, means the error response from /api/fetch-spec was likely HTML or plain text
+            errorMessage = `Proxy error (${response.status}): ${responseBodyAsText.substring(0, 200)}...`;
+          }
+          throw new Error(errorMessage);
+        }
+        
+        // If response.ok, /api/fetch-spec call was successful (HTTP 2xx)
+        // The body should contain { specObject, rawSpecText } or { error } if target fetch failed but proxy is ok
+        const result = await response.json(); 
+        
+        if (result.error) { 
+            // This means /api/fetch-spec successfully processed the request to the proxy
+            // but the operation within /api/fetch-spec (e.g., fetching from target URL, parsing spec) encountered an error.
+            throw new Error(result.error);
         }
         
         specObject = result.specObject as OpenAPI.Document;
@@ -85,7 +108,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
         inputFileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
 
       } else { // type === "file"
-        const file = data.file![0]; // FileList is guaranteed by client-side validation
+        const file = data.file![0]; 
         inputFileName = file.name;
         rawSpecText = await file.text();
         
@@ -95,13 +118,12 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
         } else {
           parsedContent = JSON.parse(rawSpecText);
         }
-        // SwaggerParser.bundle expects a plain JS object.
+        
         const specToBundle = JSON.parse(JSON.stringify(parsedContent));
         specObject = (await SwaggerParser.bundle(specToBundle)) as OpenAPI.Document; 
-        rawSpecText = YAML.dump(specObject); // Store consistently as YAML string
+        rawSpecText = YAML.dump(specObject);
       }
 
-      // Save to localStorage via action (which now handles localStorage)
       const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
       
       setSpec({
@@ -122,11 +144,10 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
       }
       form.reset({type: data.type, url: data.type === 'url' ? "" : undefined, file: undefined});
 
-
     } catch (err: any) {
       console.error("Error processing OpenAPI spec:", err);
       const errorMessage = err.message || "Failed to parse, validate, or save OpenAPI specification.";
-      setError(errorMessage);
+      setError(errorMessage); // Update store error
       toast({
         title: "Error Processing Specification",
         description: errorMessage,
@@ -145,7 +166,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           Import OpenAPI Specification
         </CardTitle>
         <CardDescription>
-          Upload a file or provide a URL. Imported specs will be saved to your browser for this session.
+          Upload a file or provide a URL. Imported specs will be saved locally in your browser.
           {currentFileName && (
              <span className="block mt-2 text-sm text-muted-foreground">
                 Currently active: <strong className="text-foreground">{currentFileName}</strong> {activeSpecId ? `(ID: ${activeSpecId.substring(0,8)}...)` : ''}
@@ -156,13 +177,14 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
       <CardContent>
         <Tabs defaultValue="url" className="w-full" onValueChange={(value) => {
           form.setValue("type", value as "url" | "file");
-          // Reset other field when tab changes to ensure correct validation context
           if (value === 'url') {
             form.setValue('file', undefined as any); 
+            form.resetField('file'); // Reset file input validation state
           } else {
             form.setValue('url', '');
+             form.resetField('url'); // Reset URL input validation state
           }
-          form.clearErrors(); // Clear previous errors
+          form.clearErrors(); 
         }}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="url"><Icons.Globe className="w-4 h-4 mr-2" />From URL</TabsTrigger>
@@ -192,14 +214,14 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
                 <FormField
                   control={form.control}
                   name="file"
-                  render={({ field: { onChange, onBlur, name, ref } }) => ( // Destructure for direct props
+                  render={({ field: { onChange, onBlur, name, ref } }) => ( 
                     <FormItem>
                       <FormLabel>Specification File</FormLabel>
                       <FormControl>
                         <Input 
                           type="file" 
                           accept=".json,.yaml,.yml"
-                           onChange={(e) => onChange(e.target.files)} // Pass FileList
+                           onChange={(e) => onChange(e.target.files)} 
                           onBlur={onBlur}
                           name={name}
                           ref={ref}

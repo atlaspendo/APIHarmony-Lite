@@ -24,7 +24,8 @@ import { useOpenApiStore } from "@/stores/openapi-store";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveOpenApiSpec } from "@/actions/openapi-actions"; // Still using this action, but it's refactored
+import { saveOpenApiSpec, getOpenApiSpecs, deleteOpenApiSpec as deleteSpecAction } from "@/actions/openapi-actions";
+import type { OpenApiSpec as LocalOpenApiSpec } from "@/actions/openapi-actions";
 
 const formSchema = z.discriminatedUnion("type", [
   z.object({
@@ -33,8 +34,9 @@ const formSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("file"),
+    // Validate FileList only on the client-side
     file: z.custom<FileList>((val) => typeof window !== 'undefined' ? val instanceof FileList : true, "Invalid file input.")
-      .refine((val) => val?.length === 1, "Please upload exactly one file.")
+      .refine((val) => typeof window !== 'undefined' ? val?.length === 1 : true, "Please upload exactly one file.")
       .refine((val) => typeof window !== 'undefined' ? val?.[0] instanceof File : true, "Uploaded item must be a file."),
   }),
 ]);
@@ -57,10 +59,10 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
     let rawSpecText: string;
     let inputFileName: string;
 
-    if (typeof window === 'undefined') {
-      setError("This operation can only be performed in the browser.");
+    if (typeof window === 'undefined' && data.type === 'file') {
+      setError("File upload can only be performed in the browser.");
       setLoading(false);
-      toast({title: "Error", description: "Cannot process specs on the server for this demo.", variant: "destructive"});
+      toast({title: "Error", description: "Cannot process file uploads on the server.", variant: "destructive"});
       return;
     }
 
@@ -72,16 +74,18 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           body: JSON.stringify({ url: data.url }),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to fetch spec from URL: ${response.statusText}`);
+        const result = await response.json(); // Always try to parse response from /api/fetch-spec
+
+        if (!response.ok || result.error) { // Check response.ok AND if result object has an error property
+          throw new Error(result.error || `Failed to fetch spec from URL: ${response.statusText}`);
         }
-        const result = await response.json();
+        
         specObject = result.specObject as OpenAPI.Document;
         rawSpecText = result.rawSpecText;
         inputFileName = data.url.substring(data.url.lastIndexOf('/') + 1) || "openapi-spec-from-url";
-      } else {
-        const file = data.file[0];
+
+      } else { // type === "file"
+        const file = data.file![0]; // FileList is guaranteed by client-side validation
         inputFileName = file.name;
         rawSpecText = await file.text();
         
@@ -91,11 +95,13 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
         } else {
           parsedContent = JSON.parse(rawSpecText);
         }
-        specObject = (await SwaggerParser.bundle(JSON.parse(JSON.stringify(parsedContent)))) as OpenAPI.Document; 
-        rawSpecText = YAML.dump(specObject); 
+        // SwaggerParser.bundle expects a plain JS object.
+        const specToBundle = JSON.parse(JSON.stringify(parsedContent));
+        specObject = (await SwaggerParser.bundle(specToBundle)) as OpenAPI.Document; 
+        rawSpecText = YAML.dump(specObject); // Store consistently as YAML string
       }
 
-      // Save to localStorage via action
+      // Save to localStorage via action (which now handles localStorage)
       const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
       
       setSpec({
@@ -107,26 +113,22 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
 
       toast({
         title: "Success",
-        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved to browser storage.`,
+        description: `OpenAPI spec "${savedSpec.name}" loaded, validated, and saved.`,
         variant: "default",
       });
       
       if (onSpecLoaded) {
         onSpecLoaded(savedSpec.id);
       }
-      form.reset();
+      form.reset({type: data.type, url: data.type === 'url' ? "" : undefined, file: undefined});
+
 
     } catch (err: any) {
       console.error("Error processing OpenAPI spec:", err);
-      let errorMessage = "Failed to parse, validate, or save OpenAPI specification.";
-      if (err.message) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
+      const errorMessage = err.message || "Failed to parse, validate, or save OpenAPI specification.";
       setError(errorMessage);
       toast({
-        title: "Error",
+        title: "Error Processing Specification",
         description: errorMessage,
         variant: "destructive",
       });
@@ -143,7 +145,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
           Import OpenAPI Specification
         </CardTitle>
         <CardDescription>
-          Upload a file or provide a URL. Imported specs will be saved to your browser's local storage.
+          Upload a file or provide a URL. Imported specs will be saved to your browser for this session.
           {currentFileName && (
              <span className="block mt-2 text-sm text-muted-foreground">
                 Currently active: <strong className="text-foreground">{currentFileName}</strong> {activeSpecId ? `(ID: ${activeSpecId.substring(0,8)}...)` : ''}
@@ -152,7 +154,16 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="url" className="w-full" onValueChange={(value) => form.setValue("type", value as "url" | "file")}>
+        <Tabs defaultValue="url" className="w-full" onValueChange={(value) => {
+          form.setValue("type", value as "url" | "file");
+          // Reset other field when tab changes to ensure correct validation context
+          if (value === 'url') {
+            form.setValue('file', undefined as any); 
+          } else {
+            form.setValue('url', '');
+          }
+          form.clearErrors(); // Clear previous errors
+        }}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="url"><Icons.Globe className="w-4 h-4 mr-2" />From URL</TabsTrigger>
             <TabsTrigger value="file"><Icons.FileJson className="w-4 h-4 mr-2" />Upload File</TabsTrigger>
@@ -167,7 +178,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
                     <FormItem>
                       <FormLabel>Specification URL</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://example.com/api/openapi.json" {...field} />
+                        <Input placeholder="https://petstore3.swagger.io/api/v3/openapi.json" {...field} />
                       </FormControl>
                       <FormDescription>
                         Enter the public URL of your OpenAPI specification file.
@@ -181,17 +192,17 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
                 <FormField
                   control={form.control}
                   name="file"
-                  render={({ field }) => ( 
+                  render={({ field: { onChange, onBlur, name, ref } }) => ( // Destructure for direct props
                     <FormItem>
                       <FormLabel>Specification File</FormLabel>
                       <FormControl>
                         <Input 
                           type="file" 
                           accept=".json,.yaml,.yml"
-                          onChange={(e) => field.onChange(e.target.files)}
-                          ref={field.ref} 
-                          name={field.name} 
-                          onBlur={field.onBlur} 
+                           onChange={(e) => onChange(e.target.files)} // Pass FileList
+                          onBlur={onBlur}
+                          name={name}
+                          ref={ref}
                         />
                       </FormControl>
                       <FormDescription>
@@ -208,7 +219,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (specId: st
                 ) : (
                   <Icons.UploadCloud className="mr-2 h-4 w-4" />
                 )}
-                Load & Save Specification
+                Load Specification
               </Button>
             </form>
           </Form>

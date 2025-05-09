@@ -15,88 +15,91 @@ export async function POST(request: NextRequest) {
     }
 
     let parsedSpec: OpenAPI.Document;
-    let rawSpecText: string;
+    let rawSpecTextForOutput: string;
 
-    const response = await fetch(specUrl);
-    responseBodyText = await response.text(); 
+    const externalResponse = await fetch(specUrl);
+    responseBodyText = await externalResponse.text(); 
 
-    if (!response.ok) {
-      let errorMsgFromServer = `Failed to fetch spec from URL: ${response.status} ${response.statusText}`;
-      
-      try {
-        if (response.headers.get('content-type')?.includes('application/json')) {
-            const errorJson = JSON.parse(responseBodyText); 
-            if (errorJson && errorJson.message) { 
-              errorMsgFromServer = errorJson.message;
-            } else if (errorJson && errorJson.error) {
-              errorMsgFromServer = errorJson.error;
-            } else {
-                errorMsgFromServer = `Received status ${response.status} with non-standard JSON error: ${responseBodyText.substring(0,200)}`;
-            }
-        } else if (responseBodyText && responseBodyText.toLowerCase().includes("<!doctype html>")) {
-             errorMsgFromServer = `Failed to fetch. Server returned an HTML page instead of a spec (Status: ${response.status})`;
-        } else if (responseBodyText && responseBodyText.length > 0 && responseBodyText.length < 300) { 
-            errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 300)}`;
-        } else if (responseBodyText && responseBodyText.length === 0 && response.statusText) {
-             errorMsgFromServer = `Server returned status ${response.status} ${response.statusText} with an empty body.`;
+    if (!externalResponse.ok) {
+      let errorMsgFromExternalServer = `Failed to fetch spec from URL: ${externalResponse.status} ${externalResponse.statusText}`; // Default
+      const contentType = externalResponse.headers.get('content-type');
+
+      if (contentType?.includes('application/json')) {
+        try {
+          const errorJson = JSON.parse(responseBodyText);
+          if (errorJson && errorJson.message) {
+            errorMsgFromExternalServer = errorJson.message;
+          } else if (errorJson && errorJson.error) {
+            errorMsgFromExternalServer = errorJson.error;
+          } else {
+            errorMsgFromExternalServer = `Received status ${externalResponse.status} with non-standard JSON error from external server.`;
+          }
+        } catch (e) {
+          errorMsgFromExternalServer = `External server claimed JSON response for error ${externalResponse.status}, but parsing failed.`;
         }
-      } catch (jsonParseError) {
-        if (responseBodyText && responseBodyText.toLowerCase().includes("<!doctype html>")) {
-            errorMsgFromServer = `Failed to fetch. Server returned an HTML page instead of a spec (Status: ${response.status})`;
-        } else if (responseBodyText && responseBodyText.length > 0 && responseBodyText.length < 300) {
-            errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 300)}`;
-        } else if (responseBodyText && responseBodyText.length === 0 && response.statusText) {
-             errorMsgFromServer = `Server returned status ${response.status} ${response.statusText} with an empty body.`;
-        } else {
-            errorMsgFromServer = `Failed to fetch spec, status ${response.status}. Error parsing response body. Body: ${responseBodyText.substring(0,200)}`;
-        }
+      } else if (responseBodyText.toLowerCase().includes("<!doctype html>")) {
+        errorMsgFromExternalServer = `Failed to fetch. External server returned an HTML page for status ${externalResponse.status}. This often indicates an authentication issue or a misconfigured URL.`;
+      } else if (responseBodyText.length > 0) {
+        errorMsgFromExternalServer = `Failed to fetch. External server returned unexpected non-JSON, non-HTML content for status ${externalResponse.status}. Preview (first 100 chars): ${responseBodyText.substring(0, 100)}`;
       }
-      throw new Error(errorMsgFromServer); 
+      // If responseBodyText is empty, the default message with statusText is used.
+      throw new Error(errorMsgFromExternalServer);
     }
     
+    // If externalResponse.ok is true
     try {
+      // Try parsing as YAML first, as it's a superset of JSON and more common for OpenAPI.
       parsedSpec = YAML.load(responseBodyText) as OpenAPI.Document;
       if (typeof parsedSpec !== 'object' || parsedSpec === null) {
-          throw new Error("Parsed YAML is not a valid object.");
+          // If YAML.load results in non-object (e.g. simple string), it's not a valid spec.
+          // This might also happen if it's actually JSON and YAML.load has an issue with it.
+          // Try JSON parsing as a fallback.
+          throw new Error("Parsed YAML is not a valid object, trying JSON.");
       }
-      // Validate and bundle the spec
-      parsedSpec = await SwaggerParser.validate(JSON.parse(JSON.stringify(parsedSpec))) as OpenAPI.Document;
-      rawSpecText = YAML.dump(parsedSpec); 
     } catch (yamlError) {
       try {
+        // Fallback to parsing as JSON
         parsedSpec = JSON.parse(responseBodyText) as OpenAPI.Document;
         if (typeof parsedSpec !== 'object' || parsedSpec === null) {
             throw new Error("Parsed JSON is not a valid object.");
         }
-        // Validate and bundle the spec
-        parsedSpec = await SwaggerParser.validate(JSON.parse(JSON.stringify(parsedSpec))) as OpenAPI.Document;
-        rawSpecText = YAML.dump(parsedSpec); 
       } catch (jsonError: any) {
         console.error('Error parsing spec as YAML or JSON:', { yamlError, jsonError });
-        throw new Error(`Failed to parse specification. Content is not valid YAML or JSON. Original error: ${jsonError.message}`);
+        throw new Error(`Failed to parse specification. Content is not valid YAML or JSON. YAML error: ${(yamlError as Error).message}, JSON error: ${jsonError.message}`);
       }
     }
+
+    // Validate and bundle the spec (SwaggerParser expects a JS object)
+    // Ensure parsedSpec is a plain JS object for SwaggerParser
+    const specToValidate = JSON.parse(JSON.stringify(parsedSpec));
+    parsedSpec = await SwaggerParser.validate(specToValidate) as OpenAPI.Document;
+    rawSpecTextForOutput = YAML.dump(parsedSpec); // Convert back to YAML for consistent storage/display
     
-    return NextResponse.json({ specObject: parsedSpec, rawSpecText });
+    return NextResponse.json({ specObject: parsedSpec, rawSpecText: rawSpecTextForOutput });
 
   } catch (error: any) {
     console.error('Error in fetch-spec proxy:', error);
-    let errorMessage = "Failed to fetch or parse OpenAPI specification from the provided URL.";
-    
+    let finalErrorMessage = "An unexpected error occurred while fetching or parsing the specification.";
+
     if (error && error.message) {
-        if (error.message.includes('Failed to fetch') || error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED') || error.message.includes('EAI_AGAIN') || error.message.includes('HTTP ERROR')) {
-            errorMessage = `Could not connect to or retrieve the specification from the URL. Please check the URL and network connectivity. Details: ${error.message}`;
-        } else if (error.message.startsWith('Non-JSON error from server') || error.message.startsWith('Failed to fetch. Server returned an HTML page')) {
-            errorMessage = error.message; 
-        } else if (error.message.startsWith('Received status') && error.message.includes('non-standard JSON error')) {
-            errorMessage = error.message;
-        } else if (responseBodyText && responseBodyText.toLowerCase().includes("<!doctype html>")) { 
-            errorMessage = `Failed to fetch. Server returned an HTML page instead of a spec.`;
-        } else {
-            errorMessage = error.message;
-        }
+      finalErrorMessage = error.message; // Default to the caught error's message
+
+      // More specific refinement based on known error message patterns
+      if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED') || error.message.includes('EAI_AGAIN')) {
+        finalErrorMessage = `Network error: Could not resolve or connect to the host. Please check the URL and your network connection. Original detail: ${error.message}`;
+      } else if (error.message.startsWith('Failed to fetch. External server returned an HTML page') ||
+                 error.message.startsWith('External server claimed JSON response for error') ||
+                 error.message.startsWith('Received status') || 
+                 error.message.startsWith('Failed to fetch. External server returned unexpected non-JSON, non-HTML content') ||
+                 error.message.startsWith('Failed to parse specification. Content is not valid YAML or JSON')) {
+        // These messages are already specific enough.
+        finalErrorMessage = error.message;
+      } else if (error.message.includes('Failed to fetch spec from URL')) { 
+        // This is a general fallback from the external fetch failure, might include statusText.
+        finalErrorMessage = error.message;
+      }
     }
     
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: finalErrorMessage }, { status: 500 });
   }
 }

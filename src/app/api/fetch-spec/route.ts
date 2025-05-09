@@ -28,13 +28,17 @@ export async function POST(request: NextRequest) {
       try {
         if (response.headers.get('content-type')?.includes('application/json')) {
             const errorJson = JSON.parse(responseBodyText); 
-            if (errorJson && errorJson.error) {
+            if (errorJson && errorJson.message) { // Check for .message which is common
+              errorMsgFromServer = errorJson.message;
+            } else if (errorJson && errorJson.error) {
               errorMsgFromServer = errorJson.error;
             }
         } else if (responseBodyText && responseBodyText.toLowerCase().includes("<!doctype html>")) {
              errorMsgFromServer = `Failed to fetch. Server returned an HTML page instead of a spec (Status: ${response.status})`;
         } else if (responseBodyText && responseBodyText.length > 0 && responseBodyText.length < 300) { 
             errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 300)}`;
+        } else if (responseBodyText && responseBodyText.length === 0 && response.statusText) {
+            errorMsgFromServer = `Server returned status ${response.status} ${response.statusText} with an empty body.`;
         }
       } catch (jsonParseError) {
         // If JSON parsing fails or content-type is not JSON, use the text based error checks
@@ -42,6 +46,8 @@ export async function POST(request: NextRequest) {
             errorMsgFromServer = `Failed to fetch. Server returned an HTML page instead of a spec (Status: ${response.status})`;
         } else if (responseBodyText && responseBodyText.length > 0 && responseBodyText.length < 300) {
             errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 300)}`;
+        } else if (responseBodyText && responseBodyText.length === 0 && response.statusText) {
+             errorMsgFromServer = `Server returned status ${response.status} ${response.statusText} with an empty body.`;
         }
       }
       throw new Error(errorMsgFromServer); 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input"; // Added import for Input
 import { Icons } from "@/components/icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { PredictionCard } from "./prediction-card";
 import { predictApiBehavior, type PredictApiBehaviorOutput } from "@/ai/flows/api-predictive-monitoring";
 import { PredictiveMonitoringInputSchema, type PredictiveMonitoringInput } from "@/ai/schemas/api-predictive-monitoring-schemas";
-import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 // Helper to generate more realistic-looking time-series data
@@ -185,20 +186,33 @@ export function PredictiveMonitoringView() {
         </CardHeader>
         <CardContent className="grid md:grid-cols-3 gap-4 pt-2">
             {[
-              { title: "Latency (ms)", data: latencyData, dataKey: "latency" },
-              { title: "Error Rate (%)", data: errorRateData, dataKey: "errorRate" },
-              { title: "Throughput (rpm)", data: throughputData, dataKey: "throughput" },
+              { title: "Latency (ms)", data: latencyData, dataKey: "latency", color: chartConfig.latency.color },
+              { title: "Error Rate (%)", data: errorRateData, dataKey: "errorRate", color: chartConfig.errorRate.color },
+              { title: "Throughput (rpm)", data: throughputData, dataKey: "throughput", color: chartConfig.throughput.color },
             ].map(chart => (
-                <div key={chart.title} className="h-[250px] p-2 border rounded-md bg-muted/20">
-                    <h4 className="text-sm font-semibold text-center mb-1">{chart.title}</h4>
+                <div key={chart.title} className="h-[250px] p-3 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
+                    <h4 className="text-sm font-semibold text-center mb-2 text-foreground">{chart.title}</h4>
                     <ChartContainer config={chartConfig} className="w-full h-[200px]">
                         <ResponsiveContainer>
                         <LineChart data={chart.data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5}/>
-                            <XAxis dataKey="date" tickFormatter={(tick) => tick.slice(5)} className="text-[10px]" />
-                            <YAxis className="text-[10px]" domain={['auto', 'auto']}/>
-                            <Tooltip contentStyle={{fontSize: '12px', padding: '4px 8px'}}/>
-                            <Line type="monotone" dataKey="value" stroke={chartConfig[chart.dataKey]?.color || "#8884d8"} strokeWidth={2} dot={false} name={chartConfig[chart.dataKey]?.label as string} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.7)" />
+                            <XAxis dataKey="date" 
+                                tickFormatter={(tick) => new Date(tick).toLocaleDateString('en-US', { month: 'short', day: 'numeric'})} 
+                                className="text-[10px] fill-muted-foreground" 
+                                interval="preserveStartEnd" 
+                                tickCount={5}
+                            />
+                            <YAxis className="text-[10px] fill-muted-foreground" domain={['auto', 'auto']} tickCount={5}/>
+                            <Tooltip
+                                content={<ChartTooltipContent 
+                                    className="text-xs shadow-lg bg-background/90 backdrop-blur-sm"
+                                    labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric'})}
+                                    formatter={(value, name) => [`${value} ${chart.dataKey === 'latency' ? 'ms' : chart.dataKey === 'errorRate' ? '%' : 'rpm'}`, chartConfig[chart.dataKey]?.label]}
+                                    indicator="line"
+                                />}
+                                cursor={{ stroke: chart.color, strokeWidth: 1.5 , strokeDasharray:"3 3"}}
+                            />
+                            <Line type="monotone" dataKey="value" stroke={chart.color} strokeWidth={2.5} dot={false} name={chartConfig[chart.dataKey]?.label as string} activeDot={{ r: 5, strokeWidth:1, fill: chart.color, stroke: "hsl(var(--background))" }}/>
                         </LineChart>
                         </ResponsiveContainer>
                     </ChartContainer>
@@ -241,7 +255,7 @@ export function PredictiveMonitoringView() {
               <Badge variant={
                 analysisResult.overallRiskLevel === "High" ? "destructive" :
                 analysisResult.overallRiskLevel === "Medium" ? "secondary" : "default"
-              } className="ml-2">
+              } className="ml-2 text-xs px-2 py-1">
                 Overall Risk: {analysisResult.overallRiskLevel || "N/A"}
               </Badge>
             </CardDescription>
@@ -249,7 +263,7 @@ export function PredictiveMonitoringView() {
           <CardContent className="pt-6 space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Icons.Zap className="w-5 h-5 text-purple-500" /> Future State Predictions ({form.getValues("predictionWindowHours")} hours)
+                <Icons.Zap className="w-5 h-5 text-accent" /> Future State Predictions ({form.getValues("predictionWindowHours")} hours)
               </h3>
               {analysisResult.predictions && analysisResult.predictions.length > 0 ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -265,6 +279,22 @@ export function PredictiveMonitoringView() {
                 </Alert>
               )}
             </div>
+
+            {analysisResult.dataInsights && analysisResult.dataInsights.length > 0 && (
+                 <div>
+                    <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                        <Icons.Lightbulb className="w-5 h-5 text-yellow-500" /> Data Insights
+                    </h3>
+                    <Alert variant="default" className="bg-muted/30">
+                        <Icons.Info className="h-4 w-4 text-muted-foreground" />
+                        <AlertDescription>
+                            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                                {analysisResult.dataInsights.map((insight, index) => <li key={`insight-${index}`}>{insight}</li>)}
+                            </ul>
+                        </AlertDescription>
+                    </Alert>
+                 </div>
+            )}
 
             {analysisResult.preventiveRecommendations && analysisResult.preventiveRecommendations.length > 0 && (
               <div>
@@ -286,3 +316,5 @@ export function PredictiveMonitoringView() {
     </div>
   );
 }
+
+    

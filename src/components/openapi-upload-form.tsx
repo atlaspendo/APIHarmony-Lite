@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,9 +24,6 @@ import { useOpenApiStore } from "@/stores/openapi-store";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// Removed local storage based actions
-// import { saveOpenApiSpec, type OpenApiSpec as LocalOpenApiSpec } from '@/actions/openapi-actions';
-
 
 const formSchema = z.discriminatedUnion("type", [
   z.object({
@@ -43,7 +41,8 @@ const formSchema = z.discriminatedUnion("type", [
 type FormValues = z.infer<typeof formSchema>;
 
 export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: string) => void }) {
-  const { setSpec, setError, setLoading, isLoading, fileName: currentFileName, activeSpecId } = useOpenApiStore();
+  const { setSpec, setError, setLoading, isLoading, fileName: currentFileName } =
+    useOpenApiStore();
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -57,7 +56,6 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
     let specObject: OpenAPI.Document;
     let rawSpecText: string;
     let inputFileName: string;
-    let responseBodyText: string | undefined;
 
     if (typeof window === 'undefined' && data.type === 'file') {
       setError("File upload can only be performed in the browser.");
@@ -74,36 +72,28 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
           body: JSON.stringify({ url: data.url }),
         });
         
-        responseBodyText = await response.text(); 
+        const responseBodyText = await response.text(); 
 
         if (!response.ok) {
-          let errorMsgFromServer = `Error fetching spec via proxy: ${response.status} ${response.statusText}`; // Default
-          
+          let descriptiveError = `Failed to fetch from URL ${data.url}: ${response.status} ${response.statusText}`; // Default
           try {
-            const errorJson = JSON.parse(responseBodyText);
-            if (errorJson && errorJson.error) {
-              errorMsgFromServer = typeof errorJson.error === 'string' ? errorJson.error : JSON.stringify(errorJson.error);
-            } else if (errorJson && errorJson.message) {
-               errorMsgFromServer = typeof errorJson.message === 'string' ? errorJson.message : JSON.stringify(errorJson.message);
+            const errorResult = JSON.parse(responseBodyText); // responseBodyText is from our /api/fetch-spec
+            if (errorResult && typeof errorResult.error === 'string') {
+              descriptiveError = errorResult.error; // Use the specific error message from our API
             } else {
-              if (responseBodyText.trim().startsWith('<')) {
-                 errorMsgFromServer = `Failed to fetch spec. External server at ${data.url} returned an HTML page (status ${response.status} ${response.statusText}). This could be an error page or authentication prompt.`;
-              } else if (responseBodyText) {
-                errorMsgFromServer = `Non-JSON error from server (${response.status}): ${responseBodyText.substring(0, 200)}...`;
-              }
+               // Our /api/fetch-spec returned ok:false but not the expected { error: "..." } JSON structure.
+              descriptiveError = `Proxy API returned an unexpected error structure (Status: ${response.status}). Raw: ${responseBodyText.substring(0,150)}...`;
             }
-          } catch (e) {
-             if (responseBodyText.trim().startsWith('<')) {
-                errorMsgFromServer = `Failed to fetch spec. External server at ${data.url} returned an HTML page (status ${response.status} ${response.statusText}) and it's not valid JSON.`;
-             } else if (responseBodyText) {
-               errorMsgFromServer = `Failed to fetch spec. External server returned unexpected non-JSON, non-HTML content for status ${response.status}. Preview (first 100 chars): ${responseBodyText.substring(0, 100)}...`;
-             }
+          } catch (parseError) {
+            // This means our /api/fetch-spec endpoint returned a non-JSON error response.
+             console.error("Proxy API returned non-JSON error:", responseBodyText);
+            descriptiveError = `Proxy API returned an invalid error format (Status: ${response.status}). Raw: ${responseBodyText.substring(0,150)}...`;
           }
-          
-          throw new Error(errorMsgFromServer); // This was line 93
+          throw new Error(descriptiveError);
         }
-        // If response.ok is true
-        const result = JSON.parse(responseBodyText); // This is fine, first read for success path
+        
+        // If response.ok, parse the already read responseBodyText
+        const result = JSON.parse(responseBodyText); 
         
         if (result.error) { 
             throw new Error(result.error);
@@ -121,22 +111,22 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
         let parsedContent;
         if (inputFileName.endsWith(".yaml") || inputFileName.endsWith(".yml")) {
           parsedContent = YAML.load(rawSpecText);
-        } else {
+        } else { // Assume JSON for .json or other extensions
           parsedContent = JSON.parse(rawSpecText);
         }
         
+        // SwaggerParser.bundle can also dereference, which is good.
+        // Ensure parsedContent is a plain JS object for SwaggerParser
         const specToBundle = JSON.parse(JSON.stringify(parsedContent));
         specObject = (await SwaggerParser.bundle(specToBundle)) as OpenAPI.Document; 
-        rawSpecText = YAML.dump(specObject);
+        // Ensure rawSpecText is YAML for consistent storage/display if desired, or keep original rawSpecText
+        rawSpecText = YAML.dump(specObject); // Convert bundled/validated spec back to YAML
       }
-      
-      // Not saving to localStorage/DB anymore. Just setting to store.
-      // const savedSpec = await saveOpenApiSpec(inputFileName, JSON.stringify(specObject), rawSpecText);
       
       setSpec({
         specObject,
         rawSpecText,
-        name: inputFileName, // Use inputFileName as it's not from DB
+        name: inputFileName,
         id: `temp-${Date.now()}`, // Temporary ID as it's not persisted
       });
 
@@ -164,6 +154,15 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
       setLoading(false);
     }
   }
+  
+  const exampleSpecs = [
+    {name: "Swagger Petstore (v2 JSON)", url: "https://petstore.swagger.io/v2/swagger.json"},
+    {name: "OpenAPI Petstore (v3 YAML)", url: "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore.yaml"},
+    // Gitea might require auth or have CORS, so it's less reliable for a quick demo fetch via simple proxy.
+    // {name: "Gitea API (v1 JSON)", url: "https://try.gitea.io/swagger.v1.json"}, 
+    {name: "Public APIs (YAML)", url: "https://api.apis.guru/v2/specs/apis.guru/2.2.0/openapi.yaml"}
+  ];
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
@@ -173,7 +172,7 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
           Import OpenAPI Specification
         </CardTitle>
         <CardDescription>
-          Upload a file or provide a URL. The imported spec will be active for the current session.
+          Upload a file (JSON/YAML) or provide a URL. The imported spec will be active for the current session.
           {currentFileName && (
              <span className="block mt-2 text-sm text-muted-foreground">
                 Currently active: <strong className="text-foreground">{currentFileName}</strong>
@@ -207,12 +206,32 @@ export function OpenApiUploadForm({ onSpecLoaded }: { onSpecLoaded?: (name: stri
                     <FormItem>
                       <FormLabel>Specification URL</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://petstore3.swagger.io/api/v3/openapi.json" {...field} />
+                        <Input placeholder="e.g., https://petstore3.swagger.io/api/v3/openapi.json" {...field} />
                       </FormControl>
                       <FormDescription>
-                        Enter the public URL of your OpenAPI specification file.
+                        Enter the public URL of your OpenAPI specification file (JSON or YAML).
                       </FormDescription>
                       <FormMessage />
+                       <div className="mt-3 pt-2 border-t">
+                            <p className="text-xs text-muted-foreground mb-1.5">Or try an example:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {exampleSpecs.map(spec => (
+                                    <Button 
+                                        key={spec.url} 
+                                        type="button" // Prevents form submission
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="text-xs"
+                                        onClick={() => {
+                                          form.setValue("url", spec.url);
+                                          form.clearErrors("url"); // Clear error if any
+                                        }}
+                                    >
+                                        {spec.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
                     </FormItem>
                   )}
                 />

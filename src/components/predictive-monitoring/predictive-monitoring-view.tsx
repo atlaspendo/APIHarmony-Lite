@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -7,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Input } from "@/components/ui/input"; // Added import for Input
 import { Textarea } from "@/components/ui/textarea";
 import { Icons } from "@/components/icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { PredictionCard } from "./prediction-card";
 import { predictApiBehavior, type PredictApiBehaviorOutput } from "@/ai/flows/api-predictive-monitoring";
 import { PredictiveMonitoringInputSchema, type PredictiveMonitoringInput } from "@/ai/schemas/api-predictive-monitoring-schemas";
-import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 // Helper to generate more realistic-looking time-series data
@@ -197,7 +199,20 @@ export function PredictiveMonitoringView() {
                             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5}/>
                             <XAxis dataKey="date" tickFormatter={(tick) => tick.slice(5)} className="text-[10px]" />
                             <YAxis className="text-[10px]" domain={['auto', 'auto']}/>
-                            <Tooltip contentStyle={{fontSize: '12px', padding: '4px 8px'}}/>
+                            <Tooltip 
+                              content={<ChartTooltipContent 
+                                         indicator="line" 
+                                         className="text-xs shadow-lg" 
+                                         labelClassName="font-semibold"
+                                         nameKey="label"
+                                       />} 
+                              cursor={{stroke: chartConfig[chart.dataKey]?.color, strokeWidth:1, strokeDasharray: "3 3"}}
+                            />
+                            <Legend 
+                              verticalAlign="top" 
+                              height={30}
+                              wrapperStyle={{fontSize: "10px"}}
+                            />
                             <Line type="monotone" dataKey="value" stroke={chartConfig[chart.dataKey]?.color || "#8884d8"} strokeWidth={2} dot={false} name={chartConfig[chart.dataKey]?.label as string} />
                         </LineChart>
                         </ResponsiveContainer>
@@ -280,9 +295,27 @@ export function PredictiveMonitoringView() {
                 </ScrollArea>
               </div>
             )}
+            
+             {analysisResult.dataInsights && analysisResult.dataInsights.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Icons.Lightbulb className="w-5 h-5 text-yellow-500" /> Data Insights
+                </h3>
+                <Alert variant="default" className="bg-yellow-500/10 border-yellow-500/50">
+                    <Icons.Info className="h-4 w-4 text-yellow-600"/>
+                     <AlertTitle className="text-yellow-700">Observed Patterns</AlertTitle>
+                    <AlertDescription className="text-yellow-600">
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                            {analysisResult.dataInsights.map((insight, index) => <li key={`insight-${index}`}>{insight}</li>)}
+                        </ul>
+                    </AlertDescription>
+                </Alert>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
     </div>
   );
 }
+
